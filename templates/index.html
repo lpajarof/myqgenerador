@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitch Architecture Canvas</title>
+    <!-- Tailwind CSS para la estructura del formulario por secciones -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Iconos Lucide para una interfaz moderna -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Parser de Markdown para el panel de análisis -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* Estilos personalizados para el canvas interactivo y utilidades */
+        :root {
+            --bg-primary: #0f172a; /* slate-900 */
+            --bg-secondary: #020617; /* slate-950 */
+            --border-color: #1e293b; /* slate-800 */
+            --text-primary: #f8fafc; /* slate-50 */
+            --text-secondary: #94a3b8; /* slate-400 */
+            --accent-color: #0ea5e9; /* sky-500 */
+            --accent-hover: #0284c7; /* sky-600 */
+        }
+
+        .canvas-container {
+            position: relative;
+            overflow: auto;
+            background-image: radial-gradient(circle, #334155 1.5px, transparent 1.5px);
+            background-size: 30px 30px;
+        }
+
+        .canvas-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 2000px;
+            height: 2000px;
+            pointer-events: none;
+        }
+
+        #nodes-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 2000px;
+            height: 2000px;
+        }
+
+        /* Estilos de Grupos en el Canvas */
+        .diagram-group {
+            position: absolute;
+            border: 2px dashed rgba(14, 165, 233, 0.4);
+            background-color: rgba(2, 6, 23, 0.6);
+            border-radius: 8px;
+            padding: 10px;
+            pointer-events: auto;
+        }
+
+        .group-label {
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: #38bdf8; /* sky-400 */
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            pointer-events: none;
+        }
+
+        /* Estilos de Nodos en el Canvas */
+        .diagram-node {
+            position: absolute;
+            width: 140px;
+            height: 70px;
+            background-color: #1e293b; /* slate-800 */
+            border: 1px solid #334155; /* slate-700 */
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            cursor: grab;
+            user-select: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        .diagram-node:active {
+            cursor: grabbing;
+            border-color: var(--accent-color);
+        }
+
+        .node-icon {
+            font-size: 1.2rem;
+            margin-bottom: 4px;
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+        }
+
+        .node-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            color: #f8fafc;
+        }
+
+        /* Ocultar scrollbars visuales del panel lateral para mantener la limpieza */
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        /* Panel de Análisis (Markdown) deslizante desde la derecha */
+        #panel-analisis {
+            transition: transform 0.25s ease-in-out;
+        }
+
+        /* Estilos de contenido para el Markdown renderizado */
+        #analisis-preview h1, #analisis-preview h2, #analisis-preview h3 {
+            font-weight: 700;
+            color: #f8fafc;
+            margin-top: 1.25em;
+            margin-bottom: 0.5em;
+        }
+        #analisis-preview h1:first-child, #analisis-preview h2:first-child { margin-top: 0; }
+        #analisis-preview h1 { font-size: 1.15rem; }
+        #analisis-preview h2 { font-size: 1.05rem; }
+        #analisis-preview h3 { font-size: 0.95rem; }
+        #analisis-preview p { margin-bottom: 0.75em; line-height: 1.6; }
+        #analisis-preview ul, #analisis-preview ol { margin: 0.5em 0 0.75em 1.25em; }
+        #analisis-preview li { margin-bottom: 0.35em; line-height: 1.5; }
+        #analisis-preview strong { color: #f8fafc; font-weight: 600; }
+        #analisis-preview code {
+            background: #1e293b;
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            font-size: 0.85em;
+            color: #38bdf8;
+        }
+        #analisis-preview pre {
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            padding: 0.75em;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-bottom: 0.75em;
+        }
+        #analisis-preview pre code { background: none; padding: 0; color: #e2e8f0; }
+        #analisis-preview hr { border-color: #1e293b; margin: 1em 0; }
+        #analisis-preview a { color: #38bdf8; text-decoration: underline; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between overflow-hidden">
+
+    <!-- HEADER PRINCIPAL -->
+    <header class="border-b border-slate-800 bg-slate-950 py-4 px-6 flex justify-between items-center h-16">
+        <div class="flex items-center gap-2">
+            <i data-lucide="layout" class="text-sky-400"></i>
+            <h1 class="text-lg font-bold text-sky-400">M&Q<strong>gendIAgram</strong></h1>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-xs bg-sky-900/50 text-sky-300 border border-sky-800 px-3 py-1 rounded-full font-mono">v1.1.0</span>
+            <button id="btnVerAnalisis" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded-lg border border-slate-700 flex items-center gap-2 transition disabled:opacity-40 disabled:pointer-events-none" disabled>
+                <i data-lucide="notebook-text" class="w-4 h-4"></i> Ver Análisis
+            </button>
+            <button id="btnExportar" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded-lg border border-slate-700 flex items-center gap-2 transition">
+                <i data-lucide="download" class="w-4 h-4"></i> Guardar JSON
+            </button>
+        </div>
+    </header>
+
+    <!-- TRABAJO Y WORKSPACE PRINCIPAL -->
+    <main class="flex-grow flex h-[calc(100vh-64px)] overflow-hidden">
+        
+        <!-- PANEL LATERAL: ENTRADA DE REQUISITOS (AGENTE 1 & 2) -->
+        <aside class="w-[420px] bg-slate-950 border-r border-slate-800 flex flex-col justify-between">
+            
+            <!-- Selector de Agente (Pestañas) -->
+            <div class="flex border-b border-slate-800 bg-slate-950 shrink-0">
+                <button id="tab-req" class="flex-1 py-3 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-all">
+                    Requisitos arquitectura
+                </button>
+                <button id="tab-doc" class="flex-1 py-3 text-xs font-semibold text-sky-400 border-b-2 border-sky-500 transition-all">
+                    Cargar caso de negocio
+                </button>                
+            </div>
+
+            <!-- CONTENEDOR CENTRAL SCRROLLABLE DEL PANEL LATERAL -->
+            <div class="flex-grow overflow-y-auto p-6 sidebar-scroll space-y-6">
+                
+                <!-- SECCIÓN AGENTE 1 (FORMULARIO ESTRUCTURADO PASO A PASO) -->
+                <div id="panel-req" class="hidden space-y-4">
+                    
+                    <!-- Indicador de pasos superior -->
+                    <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                        <span class="text-xs font-bold text-sky-400" id="step-indicator">Paso 1 de 3</span>
+                        <span class="text-xs text-slate-500" id="step-title-display">Objetivos</span>
+                    </div>
+
+                    <!-- Formulario de Requisitos Estructurados -->
+                    <form id="req-form" class="space-y-4">
+                        
+                        <!-- Paso 1: Objetivos -->
+                        <div id="form-step-1" class="step-section space-y-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Proveedor Cloud Solicitado</label>
+                                <select id="cloud_provider" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                                    <option value="AWS">Amazon Web Services (AWS)</option>
+                                    <option value="Azure">Microsoft Azure</option>
+                                    <option value="GCP">Google Cloud Platform (GCP)</option>
+                                    <option value="Multi-Cloud">Multi-Cloud / Tecnologías Agnósticas</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Objetivos de Negocio</label>
+                                <textarea id="objetivos_negocio" placeholder="Ej: Aumentar utilidades reduciendo costos de operación..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 h-20 focus:outline-none focus:border-sky-500"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Iniciativas Estratégicas de Datos</label>
+                                <textarea id="iniciativas_datos" placeholder="Ej: Reportes automatizados de ventas mensuales..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 h-20 focus:outline-none focus:border-sky-500"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Paso 2: Características de los Datos -->
+                        <div id="form-step-2" class="step-section hidden space-y-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fuentes y Orígenes</label>
+                                <input type="text" id="fuentes_origen" placeholder="Ej: SAP ERP, Salesforce API, IoT Hub" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Criticidad</label>
+                                    <input type="text" id="criticidad_fuentes" placeholder="Ej: Alta" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Volumen Diario</label>
+                                    <input type="text" id="vol_registros" placeholder="Ej: ~10k transacciones" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Frecuencia de Actualización</label>
+                                <select id="frecuencia_actualizacion" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                                    <option value="Batch (Diario)">Batch (Diario / Horario)</option>
+                                    <option value="Streaming (Tiempo Real)">Streaming (Tiempo Real)</option>
+                                    <option value="Híbrido">Híbrido (Batch + Streaming)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">SLA y Disponibilidad</label>
+                                <input type="text" id="disp_sla" placeholder="Ej: 99.9% disponibilidad" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                            </div>
+                        </div>
+
+                        <!-- Paso 3: Componentes y Capas -->
+                        <div id="form-step-3" class="step-section hidden space-y-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ingesta y Captura</label>
+                                <input type="text" id="capa_ingesta" placeholder="Ej: API Gateway, Colas de Kafka" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Almacenamiento</label>
+                                <input type="text" id="capa_almacenamiento" placeholder="Ej: Data Lake S3, PostgreSQL" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Procesamiento</label>
+                                <input type="text" id="capa_procesamiento" placeholder="Ej: Databricks, Apache Spark" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Consumo (BI / Front)</label>
+                                <input type="text" id="capa_consumo" placeholder="Ej: Tableros PowerBI, App React" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+
+                <!-- SECCIÓN AGENTE 2 (SUBIDA DE DOCUMENTO EN BRUTO) -->
+                <div id="panel-doc" class="space-y-4">
+                    <div>
+                        <h2 class="text-md font-bold text-slate-200">Subir Caso de Negocio</h2>
+                        <p class="text-xs text-slate-400 mt-1">El Agente 2 extraerá de forma autónoma los requerimientos desde tu descripción.</p>
+                    </div>
+
+                    <!-- Zona de carga de archivo -->
+                    <input type="file" id="fileCasoNegocio" accept=".txt,.md,.csv" class="hidden">
+                    <div id="dropZoneCasoNegocio" class="border-2 border-dashed border-slate-800 rounded-lg p-4 text-center cursor-pointer hover:border-sky-500 transition group">
+                        <i data-lucide="upload-cloud" class="w-5 h-5 mx-auto text-slate-500 group-hover:text-sky-400 transition"></i>
+                        <p class="text-xs text-slate-400 mt-2">
+                            <span class="text-sky-400 font-semibold">Sube un archivo</span> o arrástralo aquí
+                        </p>
+                        <p class="text-[10px] text-slate-600 mt-1">.txt, .md o .csv &middot; máx. 5MB</p>
+                    </div>
+                    <div id="fileInfoCasoNegocio" class="hidden items-center justify-between bg-slate-900 border border-slate-800 rounded-lg px-3 py-2">
+                        <span class="text-xs text-slate-300 truncate flex items-center gap-2 min-w-0">
+                            <i data-lucide="file-text" class="w-3.5 h-3.5 text-sky-400 shrink-0"></i>
+                            <span id="fileNameCasoNegocio" class="truncate"></span>
+                        </span>
+                        <button type="button" id="btnQuitarArchivo" class="text-slate-500 hover:text-red-400 transition shrink-0">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+
+                    <textarea id="txtCasoNegocio" class="w-full h-[240px] bg-slate-900 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500" placeholder="Pega aquí los requisitos brutos, correos de clientes o descripción del proyecto... (o sube un archivo arriba)"></textarea>
+                    <button id="btnProcesarCompleto" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition">
+                        <i data-lucide="play" class="w-4 h-4"></i> Diseñar Diagrama
+                    </button>
+                </div>                
+            </div>
+
+            <!-- CONTROLES Y NAVEGACIÓN INFERIOR DEL PANEL -->
+            <div class="p-6 border-t border-slate-800 bg-slate-950 shrink-0">
+                <!-- Controles para el formulario de Secciones (Solo visibles en tab-req) -->
+                <div id="req-controls" class="hidden flex justify-between items-center gap-3">
+                    <button type="button" id="prev-btn" class="flex-1 py-2 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold transition disabled:opacity-40 disabled:pointer-events-none" disabled>
+                        Atrás
+                    </button>
+                    <button type="button" id="next-btn" class="flex-1 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition">
+                        Siguiente
+                    </button>
+                    <button type="button" id="submit-btn" class="flex-1 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition hidden">
+                        Diseñar Diagrama
+                    </button>
+                </div>
+
+                <!-- Estado de Carga (Loader) -->
+                <div class="hidden flex-col items-center gap-2 mt-2" id="loader">
+                    <div class="w-6 h-6 border-2 border-slate-700 border-t-sky-500 rounded-full animate-spin"></div>
+                    <p class="text-[10px] text-slate-400 text-center">Analizando y calculando distribución de red...</p>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- LIENZO INTERACTIVO (AGENTE 3) -->
+        <section class="flex-grow flex flex-col relative bg-slate-950">
+            <div class="h-10 border-b border-slate-800 px-6 flex justify-between items-center bg-slate-900/50 shrink-0">
+                <span class="text-xs text-sky-400 flex items-center gap-1.5 font-semibold">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                    Canvas Interactivo (Agente 3)
+                </span>
+                <span class="text-[10px] text-slate-500">Arrastra los elementos para acomodarlos si lo deseas</span>
+            </div>
+            <div id="canvas-container" class="flex-grow canvas-container">
+                <svg id="canvas-svg" class="canvas-svg"></svg>
+                <div id="nodes-layer"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- PANEL DE ANÁLISIS (Markdown) - se desliza desde la derecha -->
+    <aside id="panel-analisis" class="fixed top-16 right-0 bottom-0 w-[440px] max-w-full bg-slate-950 border-l border-slate-800 shadow-2xl flex flex-col translate-x-full z-30">
+        <div class="h-12 border-b border-slate-800 px-4 flex justify-between items-center shrink-0">
+            <span class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                <i data-lucide="notebook-text" class="w-4 h-4 text-sky-400"></i>
+                Análisis de la Arquitectura
+            </span>
+            <button id="btnCerrarAnalisis" class="text-slate-500 hover:text-slate-300 transition">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <div class="flex border-b border-slate-800 shrink-0">
+            <button id="tab-analisis-preview" class="flex-1 py-2 text-xs font-semibold text-sky-400 border-b-2 border-sky-500 transition-all">
+                Vista Previa
+            </button>
+            <button id="tab-analisis-editor" class="flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-all">
+                Editar Markdown
+            </button>
+        </div>
+
+        <div class="flex-grow overflow-hidden flex flex-col">
+            <div id="analisis-preview" class="flex-grow overflow-y-auto sidebar-scroll p-5 text-sm text-slate-300"></div>
+            <textarea id="analisis-editor" class="hidden flex-grow w-full p-5 bg-slate-950 text-slate-200 text-xs font-mono resize-none border-0 focus:outline-none" spellcheck="false" placeholder="El análisis generado por el agente aparecerá aquí..."></textarea>
+        </div>
+    </aside>
+
+    <script>
+        // Variables de estado
+        let diagramData = { nodes: [], edges: [], groups: [] };
+        let activeDragNode = null;
+        let dragOffset = { x: 0, y: 0 };
+        let currentStep = 1;
+        const totalSteps = 3;
+        let analisisMarkdown = "";
+
+        // Títulos de cada paso del formulario
+        const stepTitles = {
+            1: "Objetivos",
+            2: "Datos",
+            3: "Capas"
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initTabs();
+            initStepNavigation();
+            initEventListeners();
+            initFileUpload();
+            initPanelAnalisis();
+            lucide.createIcons();
+        });
+
+        // Alternar entre pestañas (Caso de Negocio vs Secciones)
+        function initTabs() {
+            const tabDoc = document.getElementById('tab-doc');
+            const tabReq = document.getElementById('tab-req');
+            const panelDoc = document.getElementById('panel-doc');
+            const panelReq = document.getElementById('panel-req');
+            const reqControls = document.getElementById('req-controls');
+
+            tabDoc.addEventListener('click', () => {
+                tabDoc.className = "flex-1 py-3 text-xs font-semibold text-sky-400 border-b-2 border-sky-500 transition-all";
+                tabReq.className = "flex-1 py-3 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-all";
+                panelDoc.classList.remove('hidden');
+                panelReq.classList.add('hidden');
+                reqControls.classList.add('hidden');
+            });
+
+            tabReq.addEventListener('click', () => {
+                tabReq.className = "flex-1 py-3 text-xs font-semibold text-sky-400 border-b-2 border-sky-500 transition-all";
+                tabDoc.className = "flex-1 py-3 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-all";
+                panelReq.classList.remove('hidden');
+                panelDoc.classList.add('hidden');
+                reqControls.classList.remove('hidden');
+                renderStep();
+            });
+
+            // Panel activo por defecto al cargar: Requisitos estructurados
+            tabReq.click();
+        }
+
+        // Navegación secuencial por pasos
+        function initStepNavigation() {
+            document.getElementById('prev-btn').addEventListener('click', () => {
+                if (currentStep > 1) {
+                    currentStep--;
+                    renderStep();
+                }
+            });
+
+            document.getElementById('next-btn').addEventListener('click', () => {
+                if (currentStep < totalSteps) {
+                    currentStep++;
+                    renderStep();
+                }
+            });
+        }
+
+        function renderStep() {
+            // Ocultar/mostrar contenedores de paso
+            for (let i = 1; i <= totalSteps; i++) {
+                document.getElementById(`form-step-${i}`).classList.toggle('hidden', i !== currentStep);
+            }
+
+            // Actualizar indicadores visuales
+            document.getElementById('step-indicator').innerText = `Paso ${currentStep} de ${totalSteps}`;
+            document.getElementById('step-title-display').innerText = stepTitles[currentStep];
+
+            // Botones inferiores
+            document.getElementById('prev-btn').disabled = (currentStep === 1);
+            if (currentStep === totalSteps) {
+                document.getElementById('next-btn').classList.add('hidden');
+                document.getElementById('submit-btn').classList.remove('hidden');
+            } else {
+                document.getElementById('next-btn').classList.remove('hidden');
+                document.getElementById('submit-btn').classList.add('hidden');
+            }
+        }
+
+        // Carga de archivo para el Caso de Negocio (Agente 2)
+        function initFileUpload() {
+            const dropZone = document.getElementById('dropZoneCasoNegocio');
+            const fileInput = document.getElementById('fileCasoNegocio');
+            const fileInfo = document.getElementById('fileInfoCasoNegocio');
+            const fileNameEl = document.getElementById('fileNameCasoNegocio');
+            const removeBtn = document.getElementById('btnQuitarArchivo');
+            const textarea = document.getElementById('txtCasoNegocio');
+
+            const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+            const ALLOWED_EXT = ['.txt', '.md', '.csv'];
+
+            const resetDropZone = () => {
+                fileInput.value = "";
+                fileInfo.classList.add('hidden');
+                fileInfo.classList.remove('flex');
+                dropZone.classList.remove('hidden');
+            };
+
+            const handleFile = (file) => {
+                const ext = "." + file.name.split('.').pop().toLowerCase();
+                if (!ALLOWED_EXT.includes(ext)) {
+                    alert(`Formato no soportado: ${ext}. Usa uno de estos formatos: ${ALLOWED_EXT.join(', ')}.`);
+                    return;
+                }
+                if (file.size > MAX_SIZE_BYTES) {
+                    alert("El archivo supera el tamaño máximo permitido (5MB).");
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    textarea.value = e.target.result;
+                    fileNameEl.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                    fileInfo.classList.remove('hidden');
+                    fileInfo.classList.add('flex');
+                    dropZone.classList.add('hidden');
+                };
+                reader.onerror = () => alert("No se pudo leer el archivo. Intenta con otro.");
+                reader.readAsText(file);
+            };
+
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-sky-500', 'bg-sky-950/20');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('border-sky-500', 'bg-sky-950/20');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-sky-500', 'bg-sky-950/20');
+                if (e.dataTransfer.files.length) {
+                    handleFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length) {
+                    handleFile(fileInput.files[0]);
+                }
+            });
+
+            removeBtn.addEventListener('click', () => {
+                resetDropZone();
+                textarea.value = "";
+            });
+        }
+
+        // Panel de Análisis (editor/vista previa de Markdown)
+        function initPanelAnalisis() {
+            document.getElementById('btnVerAnalisis').addEventListener('click', abrirPanelAnalisis);
+            document.getElementById('btnCerrarAnalisis').addEventListener('click', cerrarPanelAnalisis);
+            document.getElementById('tab-analisis-preview').addEventListener('click', mostrarVistaPreviaAnalisis);
+            document.getElementById('tab-analisis-editor').addEventListener('click', mostrarEditorAnalisis);
+        }
+
+        function abrirPanelAnalisis() {
+            document.getElementById('panel-analisis').classList.remove('translate-x-full');
+        }
+
+        function cerrarPanelAnalisis() {
+            document.getElementById('panel-analisis').classList.add('translate-x-full');
+        }
+
+        function mostrarVistaPreviaAnalisis() {
+            document.getElementById('tab-analisis-preview').className = "flex-1 py-2 text-xs font-semibold text-sky-400 border-b-2 border-sky-500 transition-all";
+            document.getElementById('tab-analisis-editor').className = "flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-all";
+
+            // Si el usuario editó el markdown a mano, refleja esos cambios en la vista previa
+            analisisMarkdown = document.getElementById('analisis-editor').value;
+            renderizarMarkdownAnalisis();
+
+            document.getElementById('analisis-preview').classList.remove('hidden');
+            document.getElementById('analisis-editor').classList.add('hidden');
+        }
+
+        function mostrarEditorAnalisis() {
+            document.getElementById('tab-analisis-editor').className = "flex-1 py-2 text-xs font-semibold text-sky-400 border-b-2 border-sky-500 transition-all";
+            document.getElementById('tab-analisis-preview').className = "flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-all";
+
+            document.getElementById('analisis-editor').value = analisisMarkdown;
+            document.getElementById('analisis-editor').classList.remove('hidden');
+            document.getElementById('analisis-preview').classList.add('hidden');
+        }
+
+        function renderizarMarkdownAnalisis() {
+            const contenido = analisisMarkdown.trim() || "_Todavía no se ha generado ningún análisis._";
+            document.getElementById('analisis-preview').innerHTML = marked.parse(contenido);
+        }
+
+        // Actualiza el panel con el análisis devuelto por el backend y lo abre
+        function actualizarAnalisis(markdown) {
+            analisisMarkdown = markdown || "";
+            renderizarMarkdownAnalisis();
+            document.getElementById('analisis-editor').value = analisisMarkdown;
+            document.getElementById('btnVerAnalisis').disabled = false;
+            abrirPanelAnalisis();
+        }
+
+        // Eventos de envío
+        function initEventListeners() {
+            document.getElementById('btnProcesarCompleto').addEventListener('click', procesarFlujoCompleto);
+            document.getElementById('submit-btn').addEventListener('click', procesarFlujoDirecto);
+            document.getElementById('btnExportar').addEventListener('click', exportarDiagramaJSON);
+        }
+
+        // Recopila las respuestas del formulario por pasos en un objeto plano.
+        // El backend (construir_prompt_estructurado en app.py) arma el prompt
+        // final con la misma lógica de secciones que usaba index_v1.html.
+        function recopilarRequisitosEstructurados() {
+            return {
+                cloud_provider: document.getElementById('cloud_provider').value,
+                objetivos_negocio: document.getElementById('objetivos_negocio').value,
+                iniciativas_datos: document.getElementById('iniciativas_datos').value,
+                fuentes_origen: document.getElementById('fuentes_origen').value,
+                criticidad_fuentes: document.getElementById('criticidad_fuentes').value,
+                vol_registros: document.getElementById('vol_registros').value,
+                frecuencia_actualizacion: document.getElementById('frecuencia_actualizacion').value,
+                disp_sla: document.getElementById('disp_sla').value,
+                capa_ingesta: document.getElementById('capa_ingesta').value,
+                capa_almacenamiento: document.getElementById('capa_almacenamiento').value,
+                capa_procesamiento: document.getElementById('capa_procesamiento').value,
+                capa_consumo: document.getElementById('capa_consumo').value,
+            };
+        }
+
+        // Llamadas de red al backend de Flask
+        async function procesarFlujoCompleto() {
+            const texto = document.getElementById('txtCasoNegocio').value;
+            mostrarLoader(true);
+            try {
+                const res = await fetch('/api/generar-desde-documento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ documento: texto })
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                renderizarDiagrama(data.diagrama);
+                actualizarAnalisis(data.analisis);
+            } catch (err) {
+                alert("Error procesando agentes: " + err.message);
+            } finally {
+                mostrarLoader(false);
+            }
+        }
+
+        async function procesarFlujoDirecto() {
+            const requisitos = recopilarRequisitosEstructurados();
+            mostrarLoader(true);
+            try {
+                const res = await fetch('/api/generar-desde-requisitos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requisitos)
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+
+                renderizarDiagrama(data.diagrama);
+                actualizarAnalisis(data.analisis);
+            } catch (err) {
+                alert("Error diseñando diagrama estructurado: " + err.message);
+            } finally {
+                mostrarLoader(false);
+            }
+        }
+
+        // Renderizado del Canvas (Grupos, Nodos y Líneas)
+        function renderizarDiagrama(jsonDiagrama) {
+            diagramData = jsonDiagrama;
+            const container = document.getElementById('nodes-layer');
+            container.innerHTML = "";
+
+            // 1. Dibujar Grupos
+            diagramData.groups.forEach(group => {
+                const el = document.createElement('div');
+                el.className = "diagram-group";
+                el.style.left = `${group.x}px`;
+                el.style.top = `${group.y}px`;
+                el.style.width = `${group.w}px`;
+                el.style.height = `${group.h}px`;
+                el.innerHTML = `<span class="group-label">${group.label}</span>`;
+                container.appendChild(el);
+            });
+
+            // 2. Dibujar Nodos
+            diagramData.nodes.forEach(node => {
+                const el = document.createElement('div');
+                el.className = "diagram-node";
+                el.id = `node-${node.id}`;
+                el.style.left = `${node.x}px`;
+                el.style.top = `${node.y}px`;
+
+                el.innerHTML = `
+                    <span class="node-label" title="${node.label}">${node.label}</span>
+                `;
+
+                const iconEl = document.createElement(node.icon ? 'img' : 'span');
+                iconEl.className = "node-icon";
+                if (node.icon) {
+                    iconEl.src = `/icons/${node.icon}`;
+                    iconEl.alt = "";
+                    iconEl.onerror = () => {
+                        const fallback = document.createElement('span');
+                        fallback.className = "node-icon";
+                        fallback.textContent = "⚙️";
+                        iconEl.replaceWith(fallback);
+                    };
+                } else {
+                    iconEl.textContent = "⚙️";
+                }
+                el.prepend(iconEl);
+
+                el.addEventListener('mousedown', (e) => startDrag(e, node));
+                container.appendChild(el);
+            });
+
+            // 3. Trazar Conexiones
+            actualizarLineas();
+        }
+
+        function actualizarLineas() {
+            const svg = document.getElementById('canvas-svg');
+            svg.innerHTML = `
+                <defs>
+                    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#888780" />
+                    </marker>
+                </defs>
+            `;
+
+            diagramData.edges.forEach(edge => {
+                const fromNode = diagramData.nodes.find(n => n.id === edge.from);
+                const toNode = diagramData.nodes.find(n => n.id === edge.to);
+
+                if (fromNode && toNode) {
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    const fromX = fromNode.x + 70;
+                    const fromY = fromNode.y + 35;
+                    const toX = toNode.x + 70;
+                    const toY = toNode.y + 35;
+
+                    line.setAttribute("x1", fromX);
+                    line.setAttribute("y1", fromY);
+                    line.setAttribute("x2", toX);
+                    line.setAttribute("y2", toY);
+                    line.setAttribute("stroke", edge.color || "#888780");
+                    line.setAttribute("stroke-width", edge.thickness || 1.5);
+
+                    if (edge.lineStyle === "dashed") {
+                        line.setAttribute("stroke-dasharray", "5,5");
+                    }
+                    if (edge.endArrow === "arrow") {
+                        line.setAttribute("marker-end", "url(#arrow)");
+                    }
+                    svg.appendChild(line);
+                }
+            });
+        }
+
+        // Draggable Logic
+        function startDrag(e, node) {
+            if (e.button !== 0) return;
+            activeDragNode = node;
+            const el = document.getElementById(`node-${node.id}`);
+            dragOffset.x = e.clientX - el.offsetLeft;
+            dragOffset.y = e.clientY - el.offsetTop;
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+
+        function drag(e) {
+            if (!activeDragNode) return;
+            let newX = e.clientX - dragOffset.x;
+            let newY = e.clientY - dragOffset.y;
+
+            newX = Math.max(0, newX);
+            newY = Math.max(0, newY);
+
+            activeDragNode.x = newX;
+            activeDragNode.y = newY;
+
+            const el = document.getElementById(`node-${activeDragNode.id}`);
+            el.style.left = `${newX}px`;
+            el.style.top = `${newY}px`;
+
+            actualizarLineas();
+        }
+
+        function stopDrag() {
+            activeDragNode = null;
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+
+        function mostrarLoader(show) {
+            document.getElementById('loader').classList.toggle('hidden', !show);
+        }
+
+        function exportarDiagramaJSON() {
+            const jsonStr = JSON.stringify(diagramData, null, 2);
+            const blob = new Blob([jsonStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "diagrama_arquitectura.json";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>

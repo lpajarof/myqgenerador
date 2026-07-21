@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(& \"D:\\\\Proyectos\\\\Captura requisitos\\\\.venv\\\\Scripts\\\\python.exe\" \"C:\\\\Users\\\\LEANDR~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--Proyectos-Captura-requisitos\\\\6953991c-0567-4409-baf6-c5d01394f176\\\\scratchpad\\\\test_icon_tool.py\")",
+      "PowerShell(& \"D:\\\\Proyectos\\\\Captura requisitos\\\\.venv\\\\Scripts\\\\python.exe\" \"C:\\\\Users\\\\LEANDR~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--Proyectos-Captura-requisitos\\\\6953991c-0567-4409-baf6-c5d01394f176\\\\scratchpad\\\\test_agent3_build.py\")"
+    ]
+  }
+}
