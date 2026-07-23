@@ -4,7 +4,7 @@ from langchain.messages import HumanMessage
 from utils.models_IA import ModelsIA
 
 class BusinessCaseAgent:
-    def __init__(self, prompt_path: str = r"services\system_prompt\business_case_analyst_prompt.md"):
+    def __init__(self, prompt_path: str = r"services/system_prompt/business_case_analyst_prompt.md"):
         """
         Inicializa el Agente 1 cargando el modelo de IA y su respectivo System Prompt.
         """

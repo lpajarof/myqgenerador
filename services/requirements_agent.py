@@ -4,7 +4,7 @@ from langchain.messages import HumanMessage
 from utils.models_IA import ModelsIA
 
 class RequirementsAgent:
-    def __init__(self, prompt_path: str = r"services\system_prompt\requirements_prompt.md", model: str = None):
+    def __init__(self, prompt_path: str = r"services/system_prompt/requirements_prompt.md", model: str = None):
         """
         Inicializa el Agente 1 cargando el modelo de IA y su respectivo System Prompt.
         """

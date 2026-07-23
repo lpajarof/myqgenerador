@@ -5,7 +5,7 @@ from utils.models_IA import ModelsIA
 from services.icon_tools import resolver_icono_cloud
 
 class DiagramAgent:
-    def __init__(self, prompt_path: str = r"services\system_prompt\diagram_prompt.md"):
+    def __init__(self, prompt_path: str = r"services/system_prompt/diagram_prompt.md"):
         """
         Inicializa el Agente 1 cargando el modelo de IA y su respectivo System Prompt.
         """
