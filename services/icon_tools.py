@@ -1,10 +1,13 @@
 """Tool de resolución de iconos de arquitectura cloud.
 
-El paquete `diagrams` (instalado en el entorno virtual) trae una carpeta
+El paquete `diagrams` trae originalmente una carpeta
 `resources/<proveedor>/<categoria>/<servicio>.png` con los iconos oficiales
-de AWS, Azure, GCP, on-prem, etc. Los agentes de LangChain no tienen forma
-de "ver" ese sistema de archivos, así que suelen alucinar rutas de icono
-plausibles pero inexistentes (p. ej. "azure/analytics/dynamics-365.png",
+de AWS, Azure, GCP, on-prem, etc., pero vive dentro del entorno virtual
+(`.venv/`), que no se sube al repositorio ni se despliega. Por eso esa
+carpeta se copió a `static/images/icons/resources/` (sí versionada), que es
+de donde se sirve en todos los entornos. Los agentes de LangChain no tienen
+forma de "ver" ese sistema de archivos, así que suelen alucinar rutas de
+icono plausibles pero inexistentes (p. ej. "azure/analytics/dynamics-365.png",
 que no existe; el real es "azure/security/key-vaults.png" y no
 "azure/security/key-vault.png"). Esta tool le da al agente una forma de
 buscar en el índice real y devolver una ruta que sí existe.
@@ -19,7 +22,7 @@ from langchain_core.tools import tool
 
 RESOURCES_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    ".venv", "Lib", "site-packages", "resources",
+    "static", "images", "icons", "resources",
 )
 
 _PROVIDER_ALIASES = {
