@@ -51,15 +51,6 @@ wheels = [
 ]
 
 [[package]]
-name = "appnope"
-version = "0.1.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/35/5d/752690df9ef5b76e169e68d6a129fa6d08a7100ca7f754c89495db3c6019/appnope-0.1.4.tar.gz", hash = "sha256:1de3860566df9caf38f01f86f65e0e13e379af54f9e4bee1e66b48f2efffd1ee", size = 4170, upload-time = "2024-02-06T09:43:11.258Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/29/5ecc3a15d5a33e31b26c11426c45c501e439cb865d0bff96315d86443b78/appnope-0.1.4-py2.py3-none-any.whl", hash = "sha256:502575ee11cd7a28c0205f379b525beefebab9d161b7c964670864014ed7213c", size = 4321, upload-time = "2024-02-06T09:43:09.663Z" },
-]
-
-[[package]]
 name = "asttokens"
 version = "3.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -290,7 +281,6 @@ dependencies = [
     { name = "httpx-sse" },
     { name = "identify" },
     { name = "idna" },
-    { name = "ipykernel" },
     { name = "ipython" },
     { name = "ipython-pygments-lexers" },
     { name = "isodate" },
@@ -381,7 +371,6 @@ dependencies = [
     { name = "urllib3" },
     { name = "uuid-utils" },
     { name = "validators" },
-    { name = "virtualenv" },
     { name = "wcwidth" },
     { name = "websockets" },
     { name = "werkzeug" },
@@ -451,7 +440,6 @@ requires-dist = [
     { name = "httpx-sse", specifier = "==0.4.3" },
     { name = "identify", specifier = "==2.6.19" },
     { name = "idna", specifier = "==3.18" },
-    { name = "ipykernel", specifier = "==7.3.0" },
     { name = "ipython", specifier = "==9.15.0" },
     { name = "ipython-pygments-lexers", specifier = "==1.1.1" },
     { name = "isodate", specifier = "==0.7.2" },
@@ -542,7 +530,6 @@ requires-dist = [
     { name = "urllib3", specifier = "==2.7.0" },
     { name = "uuid-utils", specifier = "==0.17.0" },
     { name = "validators", specifier = "==0.35.0" },
-    { name = "virtualenv", specifier = "==21.6.1" },
     { name = "wcwidth", specifier = "==0.8.2" },
     { name = "websockets", specifier = "==15.0.1" },
     { name = "werkzeug", specifier = "==3.1.8" },
@@ -1335,30 +1322,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/cd/63/9496c57188a2ee585e0f1db071d75089a11e98aa86eb99d9d7618fc1edce/idna-3.18.tar.gz", hash = "sha256:ffb385a7e039654cef1ab9ef32c6fafe283c0c0467bba1d9029738ce4a14a848", size = 196711, upload-time = "2026-06-02T14:34:07.794Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl", hash = "sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2", size = 65455, upload-time = "2026-06-02T14:34:06.319Z" },
-]
-
-[[package]]
-name = "ipykernel"
-version = "7.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "appnope", marker = "sys_platform == 'darwin'" },
-    { name = "comm" },
-    { name = "debugpy" },
-    { name = "ipython" },
-    { name = "jupyter-client" },
-    { name = "jupyter-core" },
-    { name = "matplotlib-inline" },
-    { name = "nest-asyncio2" },
-    { name = "packaging" },
-    { name = "psutil" },
-    { name = "pyzmq" },
-    { name = "tornado" },
-    { name = "traitlets" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/c4/e4a38f579de4225a561305666f7541cdabb30075def2aa1ac17bd73c1fb5/ipykernel-7.3.0.tar.gz", hash = "sha256:9acaaaf97d16355166e4085afe9d225bfbdf2b7ef520f9df3be8f2b248275e09", size = 184899, upload-time = "2026-06-10T08:41:25.481Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3d/02/77b271f5dc58bfbc0b577c877b2365d1ffea2afe66a80c13f2312820348c/ipykernel-7.3.0-py3-none-any.whl", hash = "sha256:897eb64da762549ef610698fca5e9675195ec6ac8ec7f19d81ce1ca20c876057", size = 120583, upload-time = "2026-06-10T08:41:23.648Z" },
 ]
 
 [[package]]
