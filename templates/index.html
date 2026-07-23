@@ -44,6 +44,10 @@
             left: 0;
             width: 2000px;
             height: 2000px;
+            /* El propio contenedor no debe capturar clics: es del mismo
+               tamaño que el SVG de conexiones y, sin esto, tapa las líneas
+               (edges) incluso en las zonas donde no hay ningún nodo/grupo. */
+            pointer-events: none;
         }
 
         /* Estilos de Grupos en el Canvas */
@@ -82,6 +86,7 @@
             user-select: none;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
             z-index: 10;
+            pointer-events: auto;
         }
 
         .diagram-node:active {
@@ -155,6 +160,51 @@
         #analisis-preview pre code { background: none; padding: 0; color: #e2e8f0; }
         #analisis-preview hr { border-color: #1e293b; margin: 1em 0; }
         #analisis-preview a { color: #38bdf8; text-decoration: underline; }
+
+        /* Editor de diagrama: selección, redimensionado y edición inline */
+        .diagram-group { cursor: move; }
+
+        .resize-handle {
+            display: none;
+            position: absolute;
+            right: -6px;
+            bottom: -6px;
+            width: 11px;
+            height: 11px;
+            background: var(--accent-color);
+            border: 1px solid #f8fafc;
+            border-radius: 2px;
+            cursor: nwse-resize;
+            z-index: 30;
+        }
+
+        .diagram-node.selected,
+        .diagram-group.selected {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+        }
+
+        .diagram-node.selected .resize-handle,
+        .diagram-group.selected .resize-handle {
+            display: block;
+        }
+
+        .node-icon { cursor: pointer; }
+
+        .node-label[contenteditable="true"],
+        .group-label[contenteditable="true"] {
+            outline: 1px dashed var(--accent-color);
+            outline-offset: 2px;
+            cursor: text;
+            user-select: text;
+            white-space: normal;
+        }
+
+        /* Popover de edición de conexiones (líneas) */
+        #editor-arista { width: 15rem; }
+
+        /* Selector de íconos */
+        #iconoResultados button img { pointer-events: none; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between overflow-hidden">
@@ -162,8 +212,8 @@
     <!-- HEADER PRINCIPAL -->
     <header class="border-b border-slate-800 bg-slate-950 py-4 px-6 flex justify-between items-center h-16">
         <div class="flex items-center gap-2">
-            <i data-lucide="layout" class="text-sky-400"></i>
-            <h1 class="text-lg font-bold text-sky-400">M&Q<strong>gendIAgram</strong></h1>
+            <!-- <i data-lucide="layout" class="text-sky-400"></i> -->
+            <h1 class="text-lg font-bold text-sky-400"><strong>GendIAgram</strong></h1>
         </div>
         <div class="flex items-center gap-3">
             <span class="text-xs bg-sky-900/50 text-sky-300 border border-sky-800 px-3 py-1 rounded-full font-mono">v1.1.0</span>
@@ -289,13 +339,13 @@
                     </div>
 
                     <!-- Zona de carga de archivo -->
-                    <input type="file" id="fileCasoNegocio" accept=".txt,.md,.csv" class="hidden">
+                    <input type="file" id="fileCasoNegocio" accept=".txt,.md,.csv,.pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.gif,.bmp,.webp" class="hidden">
                     <div id="dropZoneCasoNegocio" class="border-2 border-dashed border-slate-800 rounded-lg p-4 text-center cursor-pointer hover:border-sky-500 transition group">
                         <i data-lucide="upload-cloud" class="w-5 h-5 mx-auto text-slate-500 group-hover:text-sky-400 transition"></i>
                         <p class="text-xs text-slate-400 mt-2">
                             <span class="text-sky-400 font-semibold">Sube un archivo</span> o arrástralo aquí
                         </p>
-                        <p class="text-[10px] text-slate-600 mt-1">.txt, .md o .csv &middot; máx. 5MB</p>
+                        <p class="text-[10px] text-slate-600 mt-1">.txt, .md, .csv, .pdf, .docx, .pptx, .xlsx o imagen &middot; máx. 20MB</p>
                     </div>
                     <div id="fileInfoCasoNegocio" class="hidden items-center justify-between bg-slate-900 border border-slate-800 rounded-lg px-3 py-2">
                         <span class="text-xs text-slate-300 truncate flex items-center gap-2 min-w-0">
@@ -332,7 +382,7 @@
                 <!-- Estado de Carga (Loader) -->
                 <div class="hidden flex-col items-center gap-2 mt-2" id="loader">
                     <div class="w-6 h-6 border-2 border-slate-700 border-t-sky-500 rounded-full animate-spin"></div>
-                    <p class="text-[10px] text-slate-400 text-center">Analizando y calculando distribución de red...</p>
+                    <p id="loader-text" class="text-[10px] text-slate-400 text-center">Analizando y calculando distribución de red...</p>
                 </div>
             </div>
 
@@ -343,9 +393,9 @@
             <div class="h-10 border-b border-slate-800 px-6 flex justify-between items-center bg-slate-900/50 shrink-0">
                 <span class="text-xs text-sky-400 flex items-center gap-1.5 font-semibold">
                     <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                    Canvas Interactivo (Agente 3)
+                    Diagrama
                 </span>
-                <span class="text-[10px] text-slate-500">Arrastra los elementos para acomodarlos si lo deseas</span>
+                <span class="text-[10px] text-slate-500">Clic para seleccionar &middot; doble clic para renombrar &middot; arrastra para mover o redimensionar</span>
             </div>
             <div id="canvas-container" class="flex-grow canvas-container">
                 <svg id="canvas-svg" class="canvas-svg"></svg>
@@ -382,14 +432,88 @@
         </div>
     </aside>
 
+    <!-- POPOVER DE EDICIÓN DE CONEXIÓN (arista seleccionada en el canvas) -->
+    <div id="editor-arista" class="hidden fixed z-40 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl p-3 space-y-2.5">
+        <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-slate-300">Editar conexión</span>
+            <button id="btnCerrarEditorArista" class="text-slate-500 hover:text-slate-300 transition">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+        <div>
+            <label class="block text-[10px] text-slate-500 mb-1">Etiqueta</label>
+            <input id="aristaLabel" type="text" placeholder="Ej: Streaming diario" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+            <div>
+                <label class="block text-[10px] text-slate-500 mb-1">Color</label>
+                <input id="aristaColor" type="color" class="w-full h-7 bg-slate-950 border border-slate-800 rounded cursor-pointer">
+            </div>
+            <div>
+                <label class="block text-[10px] text-slate-500 mb-1">Grosor</label>
+                <input id="aristaGrosor" type="number" min="1" max="10" step="0.5" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+            </div>
+        </div>
+        <div>
+            <label class="block text-[10px] text-slate-500 mb-1">Estilo de línea</label>
+            <select id="aristaEstilo" class="w-full bg-slate-950 border border-slate-800 rounded p-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="solid">Sólida</option>
+                <option value="dashed">Punteada</option>
+                <option value="dotted">Punto a punto</option>
+            </select>
+        </div>
+        <button id="btnEliminarArista" class="w-full text-xs text-red-400 hover:text-red-300 border border-red-900/50 hover:border-red-700 rounded py-1.5 transition">
+            Eliminar conexión
+        </button>
+    </div>
+
+    <!-- MODAL DE SELECCIÓN DE ÍCONO (clic en el ícono de un nodo) -->
+    <div id="modal-iconos" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
+        <div class="bg-slate-950 border border-slate-800 rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center shrink-0">
+                <span class="text-sm font-bold text-slate-200">Cambiar ícono</span>
+                <button id="btnCerrarModalIconos" class="text-slate-500 hover:text-slate-300 transition">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="p-4 border-b border-slate-800 flex gap-2 shrink-0">
+                <input id="iconoBusqueda" type="text" placeholder="Buscar ícono (ej. Key Vault, S3, BigQuery)..." class="flex-grow bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                <select id="iconoProveedor" class="bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    <option value="">Todos</option>
+                    <option value="aws">AWS</option>
+                    <option value="azure">Azure</option>
+                    <option value="gcp">GCP</option>
+                    <option value="onprem">On-Prem</option>
+                    <option value="k8s">Kubernetes</option>
+                    <option value="generic">Genérico</option>
+                    <option value="saas">SaaS</option>
+                </select>
+            </div>
+            <div id="iconoResultados" class="flex-grow overflow-y-auto sidebar-scroll p-4 grid grid-cols-4 gap-3">
+                <p class="col-span-4 text-xs text-slate-500 text-center py-6">Escribe para buscar íconos...</p>
+            </div>
+            <div class="p-3 border-t border-slate-800 shrink-0">
+                <button id="btnSinIcono" class="w-full text-xs text-slate-400 hover:text-slate-200 border border-slate-800 hover:border-slate-700 rounded-lg py-2 transition">
+                    Quitar ícono (usar genérico)
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Variables de estado
         let diagramData = { nodes: [], edges: [], groups: [] };
-        let activeDragNode = null;
-        let dragOffset = { x: 0, y: 0 };
         let currentStep = 1;
         const totalSteps = 3;
         let analisisMarkdown = "";
+
+        // Estado del editor de diagrama (selección, arrastre, popovers)
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        let arrastre = null;              // { tipo, objetivo, ... } mientras se mueve/redimensiona algo
+        let seleccion = null;             // { tipo: 'nodo' | 'grupo' | 'arista', id }
+        let editandoAristaIndex = null;   // índice de la arista abierta en el popover de edición
+        let nodoEditandoIcono = null;     // nodo cuyo ícono se está cambiando en el modal
+        let iconoBusquedaTimeout = null;
 
         // Títulos de cada paso del formulario
         const stepTitles = {
@@ -404,6 +528,7 @@
             initEventListeners();
             initFileUpload();
             initPanelAnalisis();
+            initEditorDiagrama();
             lucide.createIcons();
         });
 
@@ -483,14 +608,43 @@
             const removeBtn = document.getElementById('btnQuitarArchivo');
             const textarea = document.getElementById('txtCasoNegocio');
 
-            const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
-            const ALLOWED_EXT = ['.txt', '.md', '.csv'];
+            const MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+            // Formatos de texto plano: se leen directamente en el navegador.
+            const TEXT_EXT = ['.txt', '.md', '.csv'];
+            // Formatos binarios: se envían al backend, que usa langchain-markitdown
+            // para convertirlos a texto Markdown antes de volcarlos en el textarea.
+            const SERVER_EXT = ['.pdf', '.docx', '.pptx', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'];
+            const ALLOWED_EXT = [...TEXT_EXT, ...SERVER_EXT];
 
             const resetDropZone = () => {
                 fileInput.value = "";
                 fileInfo.classList.add('hidden');
                 fileInfo.classList.remove('flex');
                 dropZone.classList.remove('hidden');
+            };
+
+            const mostrarArchivoCargado = (file) => {
+                fileNameEl.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                fileInfo.classList.remove('hidden');
+                fileInfo.classList.add('flex');
+                dropZone.classList.add('hidden');
+            };
+
+            const extraerEnBackend = async (file) => {
+                mostrarLoader(true, "Extrayendo contenido del documento...");
+                const formData = new FormData();
+                formData.append('archivo', file);
+                try {
+                    const res = await fetch('/api/extraer-documento', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error);
+                    textarea.value = data.texto;
+                    mostrarArchivoCargado(file);
+                } catch (err) {
+                    alert("Error extrayendo el documento: " + err.message);
+                } finally {
+                    mostrarLoader(false);
+                }
             };
 
             const handleFile = (file) => {
@@ -500,17 +654,19 @@
                     return;
                 }
                 if (file.size > MAX_SIZE_BYTES) {
-                    alert("El archivo supera el tamaño máximo permitido (5MB).");
+                    alert("El archivo supera el tamaño máximo permitido (20MB).");
+                    return;
+                }
+
+                if (SERVER_EXT.includes(ext)) {
+                    extraerEnBackend(file);
                     return;
                 }
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     textarea.value = e.target.result;
-                    fileNameEl.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-                    fileInfo.classList.remove('hidden');
-                    fileInfo.classList.add('flex');
-                    dropZone.classList.add('hidden');
+                    mostrarArchivoCargado(file);
                 };
                 reader.onerror = () => alert("No se pudo leer el archivo. Intenta con otro.");
                 reader.readAsText(file);
@@ -670,57 +826,176 @@
         // Renderizado del Canvas (Grupos, Nodos y Líneas)
         function renderizarDiagrama(jsonDiagrama) {
             diagramData = jsonDiagrama;
+            diagramData.nodes.forEach(normalizarNodo);
+            seleccion = null;
+            cerrarEditorArista();
+
             const container = document.getElementById('nodes-layer');
             container.innerHTML = "";
 
-            // 1. Dibujar Grupos
-            diagramData.groups.forEach(group => {
-                const el = document.createElement('div');
-                el.className = "diagram-group";
-                el.style.left = `${group.x}px`;
-                el.style.top = `${group.y}px`;
-                el.style.width = `${group.w}px`;
-                el.style.height = `${group.h}px`;
-                el.innerHTML = `<span class="group-label">${group.label}</span>`;
-                container.appendChild(el);
-            });
+            // 1. Dibujar Grupos (detrás de los nodos)
+            diagramData.groups.forEach(group => container.appendChild(crearElementoGrupo(group)));
 
             // 2. Dibujar Nodos
-            diagramData.nodes.forEach(node => {
-                const el = document.createElement('div');
-                el.className = "diagram-node";
-                el.id = `node-${node.id}`;
-                el.style.left = `${node.x}px`;
-                el.style.top = `${node.y}px`;
-
-                el.innerHTML = `
-                    <span class="node-label" title="${node.label}">${node.label}</span>
-                `;
-
-                const iconEl = document.createElement(node.icon ? 'img' : 'span');
-                iconEl.className = "node-icon";
-                if (node.icon) {
-                    iconEl.src = `/icons/${node.icon}`;
-                    iconEl.alt = "";
-                    iconEl.onerror = () => {
-                        const fallback = document.createElement('span');
-                        fallback.className = "node-icon";
-                        fallback.textContent = "⚙️";
-                        iconEl.replaceWith(fallback);
-                    };
-                } else {
-                    iconEl.textContent = "⚙️";
-                }
-                el.prepend(iconEl);
-
-                el.addEventListener('mousedown', (e) => startDrag(e, node));
-                container.appendChild(el);
-            });
+            diagramData.nodes.forEach(node => container.appendChild(crearElementoNodo(node)));
 
             // 3. Trazar Conexiones
             actualizarLineas();
         }
 
+        // Los diagramas generados por el Agente 3 no traen w/h de nodo (usan
+        // el tamaño fijo original); les asignamos un tamaño editable por defecto.
+        function normalizarNodo(node) {
+            if (!node.w) node.w = 140;
+            if (!node.h) node.h = 70;
+        }
+
+        function crearElementoNodo(node) {
+            normalizarNodo(node);
+            const el = document.createElement('div');
+            el.className = "diagram-node";
+            el.id = `node-${node.id}`;
+            el.style.left = `${node.x}px`;
+            el.style.top = `${node.y}px`;
+            el.style.width = `${node.w}px`;
+            el.style.height = `${node.h}px`;
+
+            el.appendChild(crearIconoNodo(node));
+
+            const label = document.createElement('span');
+            label.className = "node-label";
+            label.title = node.label;
+            label.textContent = node.label;
+            // Mientras se edita el texto, no debe iniciar un arrastre del nodo.
+            label.addEventListener('mousedown', (e) => { if (label.isContentEditable) e.stopPropagation(); });
+            label.addEventListener('dblclick', (e) => { e.stopPropagation(); iniciarEdicionTexto(label, node); });
+            el.appendChild(label);
+
+            const handle = document.createElement('div');
+            handle.className = "resize-handle";
+            handle.title = "Arrastra para redimensionar";
+            handle.addEventListener('mousedown', (e) => iniciarArrastre(e, 'redimensionar-nodo', node));
+            el.appendChild(handle);
+
+            el.addEventListener('mousedown', (e) => iniciarArrastre(e, 'mover-nodo', node));
+
+            return el;
+        }
+
+        function crearElementoGrupo(group) {
+            const el = document.createElement('div');
+            el.className = "diagram-group";
+            el.id = `group-${group.id}`;
+            el.style.left = `${group.x}px`;
+            el.style.top = `${group.y}px`;
+            el.style.width = `${group.w}px`;
+            el.style.height = `${group.h}px`;
+
+            const label = document.createElement('span');
+            label.className = "group-label";
+            label.textContent = group.label;
+            label.style.pointerEvents = "auto";
+            label.addEventListener('mousedown', (e) => { if (label.isContentEditable) e.stopPropagation(); });
+            label.addEventListener('dblclick', (e) => { e.stopPropagation(); iniciarEdicionTexto(label, group); });
+            el.appendChild(label);
+
+            const handle = document.createElement('div');
+            handle.className = "resize-handle";
+            handle.title = "Arrastra para redimensionar";
+            handle.addEventListener('mousedown', (e) => iniciarArrastre(e, 'redimensionar-grupo', group));
+            el.appendChild(handle);
+
+            // Arrastrar el fondo/etiqueta del grupo mueve el grupo y los nodos que le pertenecen (groupId).
+            // Excepción: si el clic cae sobre (o muy cerca de) una línea que
+            // atraviesa visualmente el grupo -como los grupos transversales de
+            // Gobierno/Seguridad, que suelen cubrir todo el ancho del canvas-
+            // se prioriza seleccionar esa conexión en lugar de mover el grupo.
+            el.addEventListener('mousedown', (e) => {
+                const indiceArista = encontrarAristaEnPunto(e.clientX, e.clientY);
+                if (indiceArista !== null) {
+                    e.stopPropagation();
+                    seleccionar('arista', indiceArista, e.clientX, e.clientY);
+                    return;
+                }
+                iniciarArrastre(e, 'mover-grupo', group);
+            });
+
+            return el;
+        }
+
+        // Distancia mínima (px) al segmento de una arista para considerar que
+        // el clic "le pertenece" a ella y no al grupo que tiene debajo.
+        function encontrarAristaEnPunto(clientX, clientY, umbral = 8) {
+            const layerBox = document.getElementById('nodes-layer').getBoundingClientRect();
+            const px = clientX - layerBox.left;
+            const py = clientY - layerBox.top;
+
+            for (let i = 0; i < diagramData.edges.length; i++) {
+                const edge = diagramData.edges[i];
+                const fromNode = diagramData.nodes.find(n => n.id === edge.from);
+                const toNode = diagramData.nodes.find(n => n.id === edge.to);
+                if (!fromNode || !toNode) continue;
+
+                const dist = distanciaPuntoSegmento(
+                    px, py,
+                    fromNode.x + fromNode.w / 2, fromNode.y + fromNode.h / 2,
+                    toNode.x + toNode.w / 2, toNode.y + toNode.h / 2
+                );
+                if (dist <= umbral) return i;
+            }
+            return null;
+        }
+
+        function distanciaPuntoSegmento(px, py, x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const largoCuadrado = dx * dx + dy * dy;
+            let t = largoCuadrado === 0 ? 0 : ((px - x1) * dx + (py - y1) * dy) / largoCuadrado;
+            t = Math.max(0, Math.min(1, t));
+            const cx = x1 + t * dx;
+            const cy = y1 + t * dy;
+            return Math.hypot(px - cx, py - cy);
+        }
+
+        // Ícono del nodo: clic para abrir el selector de íconos. Si la ruta
+        // configurada no existe (404), cae de vuelta al ícono genérico.
+        function crearIconoNodo(node) {
+            if (node.icon) {
+                const img = document.createElement('img');
+                img.className = "node-icon";
+                img.title = "Clic para cambiar ícono";
+                img.src = `/icons/${node.icon}`;
+                img.alt = "";
+                img.addEventListener('mousedown', (e) => e.stopPropagation());
+                img.addEventListener('click', (e) => { e.stopPropagation(); abrirSelectorIcono(node); });
+                img.onerror = () => img.replaceWith(crearIconoGenerico(node));
+                return img;
+            }
+            return crearIconoGenerico(node);
+        }
+
+        function crearIconoGenerico(node) {
+            const span = document.createElement('span');
+            span.className = "node-icon";
+            span.title = "Clic para cambiar ícono";
+            span.textContent = "⚙️";
+            span.addEventListener('mousedown', (e) => e.stopPropagation());
+            span.addEventListener('click', (e) => { e.stopPropagation(); abrirSelectorIcono(node); });
+            return span;
+        }
+
+        function actualizarIconoNodo(node) {
+            const el = document.getElementById(`node-${node.id}`);
+            if (!el) return;
+            const anterior = el.querySelector('.node-icon');
+            const nuevo = crearIconoNodo(node);
+            if (anterior) el.replaceChild(nuevo, anterior);
+            else el.prepend(nuevo);
+        }
+
+        // Dibuja las conexiones sobre el SVG. Cada arista tiene una línea
+        // ancha invisible por debajo (más fácil de "clicar") y la línea
+        // visible encima; si tiene etiqueta, se dibuja centrada sobre ella.
         function actualizarLineas() {
             const svg = document.getElementById('canvas-svg');
             svg.innerHTML = `
@@ -731,73 +1006,417 @@
                 </defs>
             `;
 
-            diagramData.edges.forEach(edge => {
+            diagramData.edges.forEach((edge, index) => {
                 const fromNode = diagramData.nodes.find(n => n.id === edge.from);
                 const toNode = diagramData.nodes.find(n => n.id === edge.to);
+                if (!fromNode || !toNode) return;
 
-                if (fromNode && toNode) {
-                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                    const fromX = fromNode.x + 70;
-                    const fromY = fromNode.y + 35;
-                    const toX = toNode.x + 70;
-                    const toY = toNode.y + 35;
+                normalizarNodo(fromNode);
+                normalizarNodo(toNode);
 
-                    line.setAttribute("x1", fromX);
-                    line.setAttribute("y1", fromY);
-                    line.setAttribute("x2", toX);
-                    line.setAttribute("y2", toY);
-                    line.setAttribute("stroke", edge.color || "#888780");
-                    line.setAttribute("stroke-width", edge.thickness || 1.5);
+                const fromX = fromNode.x + fromNode.w / 2;
+                const fromY = fromNode.y + fromNode.h / 2;
+                const toX = toNode.x + toNode.w / 2;
+                const toY = toNode.y + toNode.h / 2;
+                const seleccionada = seleccion && seleccion.tipo === 'arista' && seleccion.id === index;
 
-                    if (edge.lineStyle === "dashed") {
-                        line.setAttribute("stroke-dasharray", "5,5");
+                const grupoSvg = document.createElementNS(SVG_NS, "g");
+
+                // Línea "hitbox" transparente, más ancha, para facilitar el clic
+                const hit = document.createElementNS(SVG_NS, "line");
+                hit.setAttribute("x1", fromX);
+                hit.setAttribute("y1", fromY);
+                hit.setAttribute("x2", toX);
+                hit.setAttribute("y2", toY);
+                hit.setAttribute("stroke", "transparent");
+                hit.setAttribute("stroke-width", 14);
+                hit.style.pointerEvents = "stroke";
+                hit.style.cursor = "pointer";
+                hit.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    seleccionar('arista', index, e.clientX, e.clientY);
+                });
+                grupoSvg.appendChild(hit);
+
+                const line = document.createElementNS(SVG_NS, "line");
+                line.setAttribute("x1", fromX);
+                line.setAttribute("y1", fromY);
+                line.setAttribute("x2", toX);
+                line.setAttribute("y2", toY);
+                line.setAttribute("stroke", seleccionada ? "#38bdf8" : (edge.color || "#888780"));
+                line.setAttribute("stroke-width", (edge.thickness || 1.5) + (seleccionada ? 1.5 : 0));
+                if (edge.lineStyle === "dashed") line.setAttribute("stroke-dasharray", "5,5");
+                if (edge.lineStyle === "dotted") line.setAttribute("stroke-dasharray", "1.5,4");
+                if (edge.endArrow === "arrow") line.setAttribute("marker-end", "url(#arrow)");
+                line.style.pointerEvents = "none";
+                grupoSvg.appendChild(line);
+
+                if (edge.label) {
+                    const text = document.createElementNS(SVG_NS, "text");
+                    text.setAttribute("x", (fromX + toX) / 2);
+                    text.setAttribute("y", (fromY + toY) / 2 - 6);
+                    text.setAttribute("text-anchor", "middle");
+                    text.setAttribute("font-size", "11");
+                    text.setAttribute("fill", "#e2e8f0");
+                    text.setAttribute("paint-order", "stroke");
+                    text.setAttribute("stroke", "#0f172a");
+                    text.setAttribute("stroke-width", "4");
+                    text.style.pointerEvents = "none";
+                    text.textContent = edge.label;
+                    grupoSvg.appendChild(text);
+                }
+
+                svg.appendChild(grupoSvg);
+            });
+        }
+
+        // ---------------------------------------------------------------
+        // Selección, arrastre (mover) y redimensionado de nodos/grupos
+        // ---------------------------------------------------------------
+
+        function iniciarArrastre(e, tipo, objetivo) {
+            if (e.button !== 0) return;
+            e.stopPropagation();
+
+            if (tipo === 'mover-nodo') {
+                seleccionar('nodo', objetivo.id);
+                const el = document.getElementById(`node-${objetivo.id}`);
+                arrastre = { tipo, objetivo, offsetX: e.clientX - el.offsetLeft, offsetY: e.clientY - el.offsetTop };
+            } else if (tipo === 'mover-grupo') {
+                seleccionar('grupo', objetivo.id);
+                const el = document.getElementById(`group-${objetivo.id}`);
+                arrastre = {
+                    tipo, objetivo,
+                    offsetX: e.clientX - el.offsetLeft,
+                    offsetY: e.clientY - el.offsetTop,
+                    grupoX0: objetivo.x,
+                    grupoY0: objetivo.y,
+                    // Nodos que pertenecen a este grupo: se mueven junto con él.
+                    nodosHijos: diagramData.nodes
+                        .filter(n => n.groupId === objetivo.id)
+                        .map(n => ({ nodo: n, x0: n.x, y0: n.y })),
+                };
+            } else if (tipo === 'redimensionar-nodo') {
+                seleccionar('nodo', objetivo.id);
+                arrastre = { tipo, objetivo, startMouseX: e.clientX, startMouseY: e.clientY, startW: objetivo.w, startH: objetivo.h };
+            } else if (tipo === 'redimensionar-grupo') {
+                seleccionar('grupo', objetivo.id);
+                arrastre = { tipo, objetivo, startMouseX: e.clientX, startMouseY: e.clientY, startW: objetivo.w, startH: objetivo.h };
+            }
+
+            document.addEventListener('mousemove', alArrastrar);
+            document.addEventListener('mouseup', detenerArrastre);
+        }
+
+        function alArrastrar(e) {
+            if (!arrastre) return;
+
+            if (arrastre.tipo === 'mover-nodo') {
+                arrastre.objetivo.x = Math.max(0, e.clientX - arrastre.offsetX);
+                arrastre.objetivo.y = Math.max(0, e.clientY - arrastre.offsetY);
+                posicionarNodo(arrastre.objetivo);
+                actualizarLineas();
+            } else if (arrastre.tipo === 'mover-grupo') {
+                const nuevoX = Math.max(0, e.clientX - arrastre.offsetX);
+                const nuevoY = Math.max(0, e.clientY - arrastre.offsetY);
+                const dx = nuevoX - arrastre.grupoX0;
+                const dy = nuevoY - arrastre.grupoY0;
+                arrastre.objetivo.x = nuevoX;
+                arrastre.objetivo.y = nuevoY;
+                posicionarGrupo(arrastre.objetivo);
+                arrastre.nodosHijos.forEach(({ nodo, x0, y0 }) => {
+                    nodo.x = x0 + dx;
+                    nodo.y = y0 + dy;
+                    posicionarNodo(nodo);
+                });
+                actualizarLineas();
+            } else if (arrastre.tipo === 'redimensionar-nodo') {
+                arrastre.objetivo.w = Math.max(80, arrastre.startW + (e.clientX - arrastre.startMouseX));
+                arrastre.objetivo.h = Math.max(50, arrastre.startH + (e.clientY - arrastre.startMouseY));
+                posicionarNodo(arrastre.objetivo);
+                actualizarLineas();
+            } else if (arrastre.tipo === 'redimensionar-grupo') {
+                arrastre.objetivo.w = Math.max(140, arrastre.startW + (e.clientX - arrastre.startMouseX));
+                arrastre.objetivo.h = Math.max(100, arrastre.startH + (e.clientY - arrastre.startMouseY));
+                posicionarGrupo(arrastre.objetivo);
+            }
+        }
+
+        function detenerArrastre() {
+            arrastre = null;
+            document.removeEventListener('mousemove', alArrastrar);
+            document.removeEventListener('mouseup', detenerArrastre);
+        }
+
+        function posicionarNodo(node) {
+            const el = document.getElementById(`node-${node.id}`);
+            if (!el) return;
+            el.style.left = `${node.x}px`;
+            el.style.top = `${node.y}px`;
+            el.style.width = `${node.w}px`;
+            el.style.height = `${node.h}px`;
+        }
+
+        function posicionarGrupo(group) {
+            const el = document.getElementById(`group-${group.id}`);
+            if (!el) return;
+            el.style.left = `${group.x}px`;
+            el.style.top = `${group.y}px`;
+            el.style.width = `${group.w}px`;
+            el.style.height = `${group.h}px`;
+        }
+
+        function seleccionar(tipo, id, clientX, clientY) {
+            seleccion = { tipo, id };
+            document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+
+            if (tipo === 'nodo') {
+                document.getElementById(`node-${id}`)?.classList.add('selected');
+                cerrarEditorArista();
+            } else if (tipo === 'grupo') {
+                document.getElementById(`group-${id}`)?.classList.add('selected');
+                cerrarEditorArista();
+            } else if (tipo === 'arista') {
+                abrirEditorArista(id, clientX, clientY);
+            }
+            actualizarLineas();
+        }
+
+        function deseleccionarTodo() {
+            seleccion = null;
+            document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+            cerrarEditorArista();
+            actualizarLineas();
+        }
+
+        function eliminarSeleccion() {
+            if (!seleccion) return;
+            if (seleccion.tipo === 'nodo') {
+                diagramData.nodes = diagramData.nodes.filter(n => n.id !== seleccion.id);
+                diagramData.edges = diagramData.edges.filter(ed => ed.from !== seleccion.id && ed.to !== seleccion.id);
+                renderizarDiagrama(diagramData);
+            } else if (seleccion.tipo === 'grupo') {
+                diagramData.groups = diagramData.groups.filter(g => g.id !== seleccion.id);
+                seleccion = null;
+                renderizarDiagrama(diagramData);
+            } else if (seleccion.tipo === 'arista') {
+                eliminarAristaSeleccionada();
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Edición de etiquetas (nodo/grupo) en línea, con doble clic
+        // ---------------------------------------------------------------
+
+        function iniciarEdicionTexto(el, objeto) {
+            el.contentEditable = "true";
+            el.focus();
+
+            const rango = document.createRange();
+            rango.selectNodeContents(el);
+            const seleccionTexto = window.getSelection();
+            seleccionTexto.removeAllRanges();
+            seleccionTexto.addRange(rango);
+
+            const confirmar = () => {
+                el.contentEditable = "false";
+                const texto = el.textContent.trim();
+                objeto.label = texto || objeto.label;
+                el.textContent = objeto.label;
+                if (el.classList.contains('node-label')) el.title = objeto.label;
+                el.removeEventListener('blur', confirmar);
+                el.removeEventListener('keydown', manejarTeclas);
+            };
+            const manejarTeclas = (ev) => {
+                if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); }
+                else if (ev.key === 'Escape') { el.textContent = objeto.label; el.blur(); }
+            };
+            el.addEventListener('blur', confirmar);
+            el.addEventListener('keydown', manejarTeclas);
+        }
+
+        // ---------------------------------------------------------------
+        // Edición de conexiones (líneas): popover con etiqueta/color/estilo
+        // ---------------------------------------------------------------
+
+        function abrirEditorArista(index, clientX, clientY) {
+            const edge = diagramData.edges[index];
+            if (!edge) return;
+            editandoAristaIndex = index;
+
+            document.getElementById('aristaLabel').value = edge.label || "";
+            document.getElementById('aristaColor').value = normalizarColorHex(edge.color) || "#888780";
+            document.getElementById('aristaGrosor').value = edge.thickness || 1.5;
+            document.getElementById('aristaEstilo').value = edge.lineStyle || "solid";
+
+            const panel = document.getElementById('editor-arista');
+            panel.classList.remove('hidden');
+            const x = Math.max(8, Math.min(clientX ?? window.innerWidth / 2, window.innerWidth - 260));
+            const y = Math.max(8, Math.min(clientY ?? window.innerHeight / 2, window.innerHeight - 280));
+            panel.style.left = `${x}px`;
+            panel.style.top = `${y}px`;
+        }
+
+        function cerrarEditorArista() {
+            document.getElementById('editor-arista')?.classList.add('hidden');
+            editandoAristaIndex = null;
+        }
+
+        function normalizarColorHex(color) {
+            if (!color) return null;
+            if (/^#[0-9a-fA-F]{6}$/.test(color)) return color;
+            if (/^#[0-9a-fA-F]{3}$/.test(color)) return '#' + color.slice(1).split('').map(c => c + c).join('');
+            return null;
+        }
+
+        function aplicarCambiosArista() {
+            if (editandoAristaIndex === null) return;
+            const edge = diagramData.edges[editandoAristaIndex];
+            if (!edge) return;
+            edge.label = document.getElementById('aristaLabel').value;
+            edge.color = document.getElementById('aristaColor').value;
+            edge.thickness = parseFloat(document.getElementById('aristaGrosor').value) || 1.5;
+            edge.lineStyle = document.getElementById('aristaEstilo').value;
+            actualizarLineas();
+        }
+
+        function eliminarAristaSeleccionada() {
+            if (editandoAristaIndex === null) return;
+            diagramData.edges.splice(editandoAristaIndex, 1);
+            seleccion = null;
+            cerrarEditorArista();
+            actualizarLineas();
+        }
+
+        // ---------------------------------------------------------------
+        // Selector de íconos (clic en el ícono de un nodo)
+        // ---------------------------------------------------------------
+
+        function abrirSelectorIcono(node) {
+            nodoEditandoIcono = node;
+            document.getElementById('modal-iconos').classList.remove('hidden');
+            const busqueda = document.getElementById('iconoBusqueda');
+            busqueda.value = node.label || "";
+            document.getElementById('iconoProveedor').value = "";
+            buscarIconos();
+            busqueda.focus();
+            busqueda.select();
+        }
+
+        function cerrarSelectorIcono() {
+            document.getElementById('modal-iconos').classList.add('hidden');
+            nodoEditandoIcono = null;
+        }
+
+        function programarBusquedaIconos() {
+            clearTimeout(iconoBusquedaTimeout);
+            iconoBusquedaTimeout = setTimeout(buscarIconos, 300);
+        }
+
+        async function buscarIconos() {
+            const q = document.getElementById('iconoBusqueda').value.trim();
+            const proveedor = document.getElementById('iconoProveedor').value;
+            const resultados = document.getElementById('iconoResultados');
+
+            if (!q) {
+                resultados.innerHTML = `<p class="col-span-4 text-xs text-slate-500 text-center py-6">Escribe para buscar íconos...</p>`;
+                return;
+            }
+
+            resultados.innerHTML = `<p class="col-span-4 text-xs text-slate-500 text-center py-6">Buscando...</p>`;
+            try {
+                const params = new URLSearchParams({ q, top_k: 24 });
+                if (proveedor) params.set('provider', proveedor);
+                const res = await fetch(`/api/iconos/buscar?${params.toString()}`);
+                const data = await res.json();
+                const candidatos = data.candidates || [];
+
+                if (!candidatos.length) {
+                    resultados.innerHTML = `<p class="col-span-4 text-xs text-slate-500 text-center py-6">Sin resultados.</p>`;
+                    return;
+                }
+
+                resultados.innerHTML = "";
+                candidatos.forEach(ruta => {
+                    const btn = document.createElement('button');
+                    btn.className = "flex flex-col items-center gap-1 p-2 rounded-lg border border-slate-800 hover:border-sky-500 hover:bg-slate-900 transition";
+                    btn.title = ruta;
+                    btn.innerHTML = `
+                        <img src="/icons/${ruta}" class="w-8 h-8 object-contain" alt="">
+                        <span class="text-[9px] text-slate-400 truncate w-full text-center">${ruta.split('/').pop()}</span>
+                    `;
+                    btn.addEventListener('click', () => seleccionarIcono(ruta));
+                    resultados.appendChild(btn);
+                });
+            } catch (err) {
+                resultados.innerHTML = `<p class="col-span-4 text-xs text-red-400 text-center py-6">Error buscando íconos.</p>`;
+            }
+        }
+
+        function seleccionarIcono(ruta) {
+            if (!nodoEditandoIcono) return;
+            nodoEditandoIcono.icon = ruta;
+            actualizarIconoNodo(nodoEditandoIcono);
+            cerrarSelectorIcono();
+        }
+
+        // ---------------------------------------------------------------
+        // Inicialización de listeners globales del editor de diagrama
+        // ---------------------------------------------------------------
+
+        function initEditorDiagrama() {
+            // Clic en el fondo vacío del canvas: deselecciona lo que esté activo.
+            // (nodes-layer y el <svg> raíz tienen pointer-events:none para no
+            // tapar las líneas, así que el clic en zona vacía llega directo
+            // al contenedor del canvas.)
+            document.getElementById('canvas-container').addEventListener('mousedown', (e) => {
+                if (e.target.id === 'canvas-container' || e.target.id === 'nodes-layer') deseleccionarTodo();
+            });
+
+            ['aristaLabel', 'aristaColor', 'aristaGrosor', 'aristaEstilo'].forEach(id => {
+                document.getElementById(id).addEventListener('input', aplicarCambiosArista);
+            });
+            document.getElementById('btnEliminarArista').addEventListener('click', eliminarAristaSeleccionada);
+            document.getElementById('btnCerrarEditorArista').addEventListener('click', deseleccionarTodo);
+
+            document.getElementById('btnCerrarModalIconos').addEventListener('click', cerrarSelectorIcono);
+            document.getElementById('modal-iconos').addEventListener('mousedown', (e) => {
+                if (e.target.id === 'modal-iconos') cerrarSelectorIcono();
+            });
+            document.getElementById('iconoBusqueda').addEventListener('input', programarBusquedaIconos);
+            document.getElementById('iconoProveedor').addEventListener('change', buscarIconos);
+            document.getElementById('btnSinIcono').addEventListener('click', () => {
+                if (!nodoEditandoIcono) return;
+                nodoEditandoIcono.icon = null;
+                actualizarIconoNodo(nodoEditandoIcono);
+                cerrarSelectorIcono();
+            });
+
+            document.addEventListener('keydown', (e) => {
+                const activo = document.activeElement;
+                const editandoTexto = activo && (activo.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(activo.tagName));
+
+                if (e.key === 'Escape') {
+                    if (!document.getElementById('modal-iconos').classList.contains('hidden')) {
+                        cerrarSelectorIcono();
+                    } else {
+                        deseleccionarTodo();
                     }
-                    if (edge.endArrow === "arrow") {
-                        line.setAttribute("marker-end", "url(#arrow)");
-                    }
-                    svg.appendChild(line);
+                    return;
+                }
+
+                if (editandoTexto) return;
+
+                if ((e.key === 'Delete' || e.key === 'Backspace') && seleccion) {
+                    e.preventDefault();
+                    eliminarSeleccion();
                 }
             });
         }
 
-        // Draggable Logic
-        function startDrag(e, node) {
-            if (e.button !== 0) return;
-            activeDragNode = node;
-            const el = document.getElementById(`node-${node.id}`);
-            dragOffset.x = e.clientX - el.offsetLeft;
-            dragOffset.y = e.clientY - el.offsetTop;
-
-            document.addEventListener('mousemove', drag);
-            document.addEventListener('mouseup', stopDrag);
-        }
-
-        function drag(e) {
-            if (!activeDragNode) return;
-            let newX = e.clientX - dragOffset.x;
-            let newY = e.clientY - dragOffset.y;
-
-            newX = Math.max(0, newX);
-            newY = Math.max(0, newY);
-
-            activeDragNode.x = newX;
-            activeDragNode.y = newY;
-
-            const el = document.getElementById(`node-${activeDragNode.id}`);
-            el.style.left = `${newX}px`;
-            el.style.top = `${newY}px`;
-
-            actualizarLineas();
-        }
-
-        function stopDrag() {
-            activeDragNode = null;
-            document.removeEventListener('mousemove', drag);
-            document.removeEventListener('mouseup', stopDrag);
-        }
-
-        function mostrarLoader(show) {
+        function mostrarLoader(show, mensaje) {
             document.getElementById('loader').classList.toggle('hidden', !show);
+            document.getElementById('loader-text').textContent = mensaje || "Analizando y calculando distribución de red...";
         }
 
         function exportarDiagramaJSON() {

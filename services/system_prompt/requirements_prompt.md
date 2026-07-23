@@ -27,6 +27,7 @@ El usuario te proporcionará información basada en los siguientes ejes. Debes m
     * Seguridad (IAM, Cifrado, Secretos)
     * Consumo (BI, APIs, IA/ML, Data Products)
     * Operación (Monitoreo, Observabilidad, CI/CD, DataOps)
+    * Cada una de las capas deberá estar separada.  No agrupar capas en un mismo bloque.
 ---
 # 3. Reglas de Diseño Arquitectónico
 * **Desacoplamiento:** Separa la computación del almacenamiento.
@@ -52,14 +53,27 @@ Genera un bloque de código JSON válido con la estructura exacta que se describ
     "cloud_provider": "AWS | Azure | GCP | Multi-Cloud",
     "description": "Breve resumen de la solución propuesta"
   },
+  "groups": [
+    {
+      "id": "ID_UNICO_GRUPO_1",
+      "label": "Nombre de la Capa (Ej: Fuentes de Datos | Captura e Ingesta | Almacenamiento | Procesamiento | Consumo)",
+      "x": 0,
+      "y": 0,
+      "w": 300,
+      "h": 500
+    }
+  ],
   "nodes": [
     {
       "id": "ID_UNICO_NODO_1",
+      "group_id": "ID_UNICO_GRUPO_1",
       "label": "Nombre del Componente (Ej: AWS Glue, Azure Synapse, dbt)",
       "type": "Source | Ingestion | Storage | Processing | Security | Governance | Consumption | Operation",
       "layer": "Fuentes de Datos | Captura e Ingesta | Almacenamiento | Procesamiento | Gobierno | Seguridad | Consumo | Operación",
       "technology": "Tecnología específica (Ej: PostgreSQL, Apache Kafka, Snowflake)",
-      "criticality": "High | Medium | Low"
+      "criticality": "High | Medium | Low",
+      "x": 40,
+      "y": 80
     }
   ],
   "edges": [

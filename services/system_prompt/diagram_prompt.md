@@ -11,13 +11,62 @@ Tu salida debe ser un objeto JSON perfectamente estructurado que represente los 
 ## 2. Reglas de Distribución Espacial (Cálculo de Coordenadas)
 Debes posicionar y dimensionar los contenedores (groups) y los componentes (nodes) siguiendo un flujo estrictamente horizontal (de izquierda a derecha):
 
-1. **Alineación de Grupos (Groups):**
-   - Todos los grupos principales de la arquitectura deben alinearse verticalmente en la coordenada `y: 0`.
-   - Distribuye los grupos secuencialmente en el eje `x` dejando un margen de separación de al menos 30 píxeles entre ellos para evitar solapamientos. 
-   - *Ejemplo de distribución:* 
-     - Grupo 1 (Origen/Fuentes): `x: 0`, `w: 269`, `y: 0`
-     - Grupo 2 (Procesamiento/Nube): `x: 300`, `w: 480`, `y: 0`
-     - Grupo 3 (Consumo/Acceso): `x: 820`, `w: 264`, `y: 0`
+1. **Alineación de Grupos Principales y Transversales:**
+
+   - Grupos Principales (Flujo de Datos): Todos los grupos de procesamiento lineal (ej. Fuentes, Ingesta, Almacenamiento, Consumo) deben alinearse en la parte superior con y: 0 y distribuirse secuencialmente sobre el eje x, dejando un margen de separación de al menos 30 píxeles entre ellos.
+
+   - Grupos Transversales (Soporte y Gobernanza): Si el grupo está asociado con Gobierno, Monitoreo o Seguridad, debe ubicarse en la parte inferior (y mayor al alto h de los grupos superiores) de forma transversal.
+
+   - Ancho del Grupo Transversal: Su posición inicial debe ser x: 0 y su ancho (w) debe ser equivalente a la suma del ancho de todos los grupos superiores más sus márgenes de separación, abarcando así todo el diagrama.
+
+   - Ejemplo de distribución espacial:
+
+       - Grupo 1 (Origen/Fuentes): x: 0, y: 0, w: 270, h: 300
+
+       - Grupo 2 (Procesamiento/Nube): x: 300, y: 0, w: 480, h: 300 (Separación de 30px respecto al Grupo 1)
+
+       - Grupo 3 (Consumo/Acceso): x: 810, y: 0, w: 270, h: 300 (Separación de 30px respecto al Grupo 2)
+
+       - Grupo 4 Transversal (Gobierno y Seguridad): x: 0, y: 340, w: 1080, h: 150 (Ubicado debajo dejando un margen vertical de 40px, abarcando desde x: 0 hasta el final del Grupo 3)
+    
+    - Ejemplo del JSON de salida para los grupos:
+
+```json
+    "groups": [
+  {
+    "id": "GRP_01",
+    "label": "Fuentes de Datos",
+    "x": 0,
+    "y": 0,
+    "w": 270,
+    "h": 300
+  },
+  {
+    "id": "GRP_02",
+    "label": "Procesamiento y Analítica",
+    "x": 300,
+    "y": 0,
+    "w": 480,
+    "h": 300
+  },
+  {
+    "id": "GRP_03",
+    "label": "Consumo de Datos",
+    "x": 810,
+    "y": 0,
+    "w": 270,
+    "h": 300
+  },
+  {
+    "id": "GRP_TRANSVERSAL",
+    "label": "Gobierno, Monitoreo y Seguridad",
+    "x": 0,
+    "y": 340,
+    "w": 1080,
+    "h": 150
+  }
+]
+```
 
 2. **Límites y Posición de los Nodos dentro de Grupos:**
    - Cualquier nodo que pertenezca a un grupo (`groupId` coincidente con el `id` del grupo) debe tener coordenadas `x` e `y` que queden **completamente dentro** de los límites físicos del grupo.

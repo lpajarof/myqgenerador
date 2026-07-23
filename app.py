@@ -2,7 +2,8 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 from dotenv import load_dotenv
 from services.services import generar_diagrama_completo, generar_diagrama_desde_documento
-from services.icon_tools import RESOURCES_DIR
+from services.icon_tools import RESOURCES_DIR, buscar_icono
+from services.document_extraction import extraer_texto_de_archivo
 
 load_dotenv()  
 
@@ -44,13 +45,13 @@ CAPAS DE LA ARQUITECTURA DISPONIBLES (Requerimientos específicos):
 - Consumo: {datos.get('capa_consumo', 'No especificado')}
 - Operación: {datos.get('capa_operacion', 'No especificado')}"""
 
-
+# Ruta principal
 @app.route("/")
 def index():
     # Renderiza la vista del Workspace principal
     return render_template("index.html")
 
-
+# Rutas para servir iconos de proveedores y servicios
 @app.route("/icons/<path:icon_path>")
 def servir_icono(icon_path):
     """Sirve los iconos del paquete `diagrams` (resources/proveedor/categoria/servicio.png)
@@ -58,7 +59,7 @@ def servir_icono(icon_path):
     pertenecen al entorno virtual, no al proyecto."""
     return send_from_directory(RESOURCES_DIR, icon_path)
 
-
+# Rutas de la API para invocar a los agentes
 @app.route("/api/generar-desde-requisitos", methods=["POST"])
 def generar_desde_requisitos():
     """Recibe los requisitos estructurados capturados en el formulario por
@@ -79,7 +80,43 @@ def generar_desde_requisitos():
 
     return jsonify(resultado)
 
+# Ruta para extraer contenido de documentos
+@app.route("/api/extraer-documento", methods=["POST"])
+def extraer_documento():
+    """Recibe un archivo (PDF, imagen, DOCX, PPTX o XLSX) subido en el panel
+    "Cargar caso de negocio" y usa langchain-markitdown para convertirlo a
+    texto Markdown, listo para volcarse en el cuadro de texto que se envía
+    al Agente 2."""
+    archivo = request.files.get("archivo")
+    if archivo is None or archivo.filename == "":
+        return jsonify({"error": "No se recibió ningún archivo."}), 400
 
+    try:
+        texto = extraer_texto_de_archivo(archivo.filename, archivo.read())
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Error extrayendo el contenido del archivo: {e}"}), 500
+
+    return jsonify({"texto": texto})
+
+# Ruta de búsqueda de íconos para el selector del editor de diagrama
+@app.route("/api/iconos/buscar")
+def buscar_iconos():
+    """Busca íconos de proveedores cloud en el índice del paquete `diagrams`
+    para el selector de íconos del editor del diagrama (clic en el ícono de
+    un nodo)."""
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"candidates": []})
+
+    provider = request.args.get("provider") or None
+    top_k = request.args.get("top_k", default=24, type=int)
+
+    resultado = buscar_icono(query, provider=provider, top_k=top_k)
+    return jsonify({"candidates": resultado.get("candidates", [])})
+
+# Ruta para generar diagrama desde documento
 @app.route("/api/generar-desde-documento", methods=["POST"])
 def generar_desde_documento():
     """Recibe el caso de negocio en texto libre (panel Caso de Negocio) y
