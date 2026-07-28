@@ -35,7 +35,6 @@ class DiagramAgent:
         Envía el input del usuario al agente y retorna la respuesta de texto plano.
         """
         query = HumanMessage(content=user_input)
-        response = self.agent.invoke({"messages": [query]})
-        
+        response = self.agent.invoke({"messages": [query]})        
         # Retorna el contenido del último mensaje de la cadena
         return response["messages"][-1].content

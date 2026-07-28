@@ -10,6 +10,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Parser de Markdown para el panel de análisis -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Librería para exportar el canvas HTML a imagen PNG -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         /* Estilos personalizados para el canvas interactivo y utilidades */
         :root {
@@ -35,7 +37,7 @@
             left: 0;
             width: 2000px;
             height: 2000px;
-            pointer-events: none;
+            pointer-events: auto;
         }
 
         #nodes-layer {
@@ -222,6 +224,21 @@
             </button>
             <button id="btnExportar" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded-lg border border-slate-700 flex items-center gap-2 transition">
                 <i data-lucide="download" class="w-4 h-4"></i> Guardar JSON
+            </button>
+            <button id="btnExportarPNG" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded-lg border border-slate-700 flex items-center gap-2 transition">
+                <i data-lucide="image" class="w-4 h-4"></i> Guardar PNG
+            </button>
+            <button id="btnExportarDrawio" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded-lg border border-slate-700 flex items-center gap-2 transition">
+                <i data-lucide="file-text" class="w-4 h-4"></i> Exportar draw.io
+            </button>
+            <button id="btnAgregarConexion" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded-lg border border-slate-700 flex items-center gap-2 transition">
+                <i data-lucide="shuffle" class="w-4 h-4"></i> Agregar conexión
+            </button>
+            <button id="btnEliminarNodo" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded-lg border border-red-700 flex items-center gap-2 transition">
+                <i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar nodo
+            </button>
+            <button id="btnAgregarNodo" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded-lg border border-slate-700 flex items-center gap-2 transition">
+                <i data-lucide="plus-square" class="w-4 h-4"></i> Agregar nodo
             </button>
         </div>
     </header>
@@ -467,6 +484,105 @@
         </button>
     </div>
 
+    <!-- MODAL DE AGREGAR UN NUEVO NODO O COMPONENTE -->
+    <div id="modal-agregar-nodo" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
+        <div class="bg-slate-950 border border-slate-800 rounded-xl w-full max-w-lg shadow-2xl">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center shrink-0">
+                <span class="text-sm font-bold text-slate-200">Agregar nodo o componente</span>
+                <button id="btnCerrarModalAgregarNodo" class="text-slate-500 hover:text-slate-300 transition">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1">Nombre del nodo</label>
+                    <input id="agregarNodoLabel" type="text" placeholder="Ej: Data Lake" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1">Ruta del ícono (opcional)</label>
+                    <div class="flex gap-2">
+                        <input id="agregarNodoIcono" type="text" placeholder="aws/storage/s3.png" class="flex-grow bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                        <button id="btnSeleccionarIconoNuevoNodo" type="button" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg px-3 py-2 border border-slate-700 transition">Seleccionar</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1">Grupo (opcional)</label>
+                    <select id="agregarNodoGroup" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                        <option value="">Sin grupo</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button id="btnCancelarAgregarNodo" class="text-xs text-slate-400 hover:text-slate-200 border border-slate-800 rounded-lg px-4 py-2 transition">Cancelar</button>
+                    <button id="btnConfirmarAgregarNodo" class="text-xs bg-sky-500 hover:bg-sky-400 text-slate-950 rounded-lg px-4 py-2 transition">Agregar nodo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE AGREGAR UNA NUEVA CONEXIÓN -->
+    <div id="modal-agregar-conexion" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
+        <div class="bg-slate-950 border border-slate-800 rounded-xl w-full max-w-lg shadow-2xl">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center shrink-0">
+                <span class="text-sm font-bold text-slate-200">Agregar conexión</span>
+                <button id="btnCerrarModalAgregarConexion" class="text-slate-500 hover:text-slate-300 transition">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <span id="conexionStatusText" class="block text-[10px] text-slate-400 mb-2">Selecciona origen y destino en el modal o usa canvas.</span>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1">Nodo origen</label>
+                    <div class="flex gap-2">
+                        <select id="conexionSource" class="flex-grow bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"></select>
+                        <button id="btnSeleccionarOrigenCanvas" type="button" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg px-3 py-2 border border-slate-700 transition">Seleccionar</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1">Nodo destino</label>
+                    <div class="flex gap-2">
+                        <select id="conexionTarget" class="flex-grow bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500"></select>
+                        <button id="btnSeleccionarDestinoCanvas" type="button" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg px-3 py-2 border border-slate-700 transition">Seleccionar</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1">Etiqueta</label>
+                    <input id="conexionLabel" type="text" placeholder="Ej: Flujo de datos" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] text-slate-500 mb-1">Color</label>
+                        <input id="conexionColor" type="color" value="#888780" class="w-full h-10 bg-slate-900 border border-slate-800 rounded-lg cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 mb-1">Grosor</label>
+                        <input id="conexionGrosor" type="number" min="1" max="10" step="0.5" value="1.5" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1">Estilo</label>
+                    <select id="conexionEstilo" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                        <option value="solid">Sólida</option>
+                        <option value="dashed">Punteada</option>
+                        <option value="dotted">Punto a punto</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-500 mb-1">Flecha final</label>
+                    <select id="conexionArrow" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                        <option value="none">Ninguna</option>
+                        <option value="arrow">Flecha</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button id="btnCancelarAgregarConexion" class="text-xs text-slate-400 hover:text-slate-200 border border-slate-800 rounded-lg px-4 py-2 transition">Cancelar</button>
+                    <button id="btnConfirmarAgregarConexion" class="text-xs bg-sky-500 hover:bg-sky-400 text-slate-950 rounded-lg px-4 py-2 transition">Crear conexión</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL DE SELECCIÓN DE ÍCONO (clic en el ícono de un nodo) -->
     <div id="modal-iconos" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
         <div class="bg-slate-950 border border-slate-800 rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
@@ -513,6 +629,8 @@
         let seleccion = null;             // { tipo: 'nodo' | 'grupo' | 'arista', id }
         let editandoAristaIndex = null;   // índice de la arista abierta en el popover de edición
         let nodoEditandoIcono = null;     // nodo cuyo ícono se está cambiando en el modal
+        let editandoIconoEnNuevoNodo = false;
+        let conexionSeleccionando = null; // { field: 'source'|'target', source: id|null, target: id|null }
         let iconoBusquedaTimeout = null;
 
         // Títulos de cada paso del formulario
@@ -759,6 +877,205 @@
             document.getElementById('btnProcesarCompleto').addEventListener('click', procesarFlujoCompleto);
             document.getElementById('submit-btn').addEventListener('click', procesarFlujoDirecto);
             document.getElementById('btnExportar').addEventListener('click', exportarDiagramaJSON);
+            document.getElementById('btnExportarPNG').addEventListener('click', exportarDiagramaPNG);
+            document.getElementById('btnExportarDrawio').addEventListener('click', exportarDiagramaDrawio);
+            document.getElementById('btnAgregarConexion').addEventListener('click', abrirModalAgregarConexion);
+            document.getElementById('btnEliminarNodo').addEventListener('click', eliminarNodoSeleccionado);
+            document.getElementById('btnAgregarNodo').addEventListener('click', abrirModalAgregarNodo);
+            document.getElementById('btnCerrarModalAgregarNodo').addEventListener('click', cerrarModalAgregarNodo);
+            document.getElementById('btnCancelarAgregarNodo').addEventListener('click', cerrarModalAgregarNodo);
+            document.getElementById('btnConfirmarAgregarNodo').addEventListener('click', agregarNodo);
+            document.getElementById('btnSeleccionarIconoNuevoNodo').addEventListener('click', abrirSelectorIconoNuevoNodo);
+            document.getElementById('btnCerrarModalAgregarConexion').addEventListener('click', cerrarModalAgregarConexion);
+            document.getElementById('btnCancelarAgregarConexion').addEventListener('click', cerrarModalAgregarConexion);
+            document.getElementById('btnConfirmarAgregarConexion').addEventListener('click', agregarConexion);
+            document.getElementById('btnSeleccionarOrigenCanvas').addEventListener('click', () => iniciarSeleccionConexionEnCanvas('source'));
+            document.getElementById('btnSeleccionarDestinoCanvas').addEventListener('click', () => iniciarSeleccionConexionEnCanvas('target'));
+        }
+
+        async function exportarDiagramaPNG() {
+            const container = document.getElementById('canvas-container');
+            if (!container) {
+                alert('No hay diagrama disponible para exportar.');
+                return;
+            }
+
+            mostrarLoader(true, 'Generando imagen PNG...');
+            try {
+                const canvas = await html2canvas(container, {
+                    backgroundColor: null,
+                    scale: 2,
+                    useCORS: true,
+                });
+
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        alert('No se pudo generar la imagen PNG.');
+                        return;
+                    }
+
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'diagrama_arquitectura.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 'image/png');
+            } catch (err) {
+                alert('Error exportando PNG: ' + err.message);
+            } finally {
+                mostrarLoader(false);
+            }
+        }
+
+        async function exportarDiagramaDrawio() {
+            mostrarLoader(true, 'Exportando a draw.io...');
+            try {
+                const iconDataMap = await fetchIconDataUrls(diagramData);
+                const xml = buildDrawioXml(diagramData, iconDataMap);
+                const blob = new Blob([xml], { type: 'application/xml' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'diagrama_arquitectura.drawio';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Error exportando draw.io: ' + err.message);
+            } finally {
+                mostrarLoader(false);
+            }
+        }
+
+        async function fetchIconDataUrls(diagram) {
+            const iconMap = new Map();
+            const iconPaths = Array.from(new Set(diagram.nodes.map(node => node.icon).filter(Boolean)));
+
+            await Promise.all(iconPaths.map(async (iconPath) => {
+                try {
+                    const response = await fetch(`/icons/${iconPath}`);
+                    if (!response.ok) throw new Error('No se pudo cargar el icono: ' + iconPath);
+                    const blob = await response.blob();
+                    const dataUrl = await blobToDataUrl(blob);
+                    iconMap.set(iconPath, dataUrl);
+                } catch (err) {
+                    console.warn('No se pudo importar icono para draw.io:', iconPath, err);
+                    iconMap.set(iconPath, null);
+                }
+            }));
+
+            return iconMap;
+        }
+
+        function blobToDataUrl(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        function escapeXml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+        }
+
+        function buildDrawioXml(diagram, iconDataMap) {
+            const cells = [];
+            cells.push('<mxCell id="0"/>');
+            cells.push('<mxCell id="1" parent="0"/>');
+
+            diagram.groups.forEach(group => {
+                const groupId = `group-${escapeXml(group.id)}`;
+                const label = escapeXml(group.label || 'Grupo');
+                const style = 'group=1;container=1;recursiveResize=1;collapsible=0;rounded=1;strokeColor=#38bdf8;fillColor=none;align=left;verticalAlign=top;fontSize=11;fontColor=#0f172a;';
+                cells.push(
+                    `<mxCell id="${groupId}" value="${label}" style="${style}" vertex="1" parent="1">` +
+                    `<mxGeometry x="${group.x}" y="${group.y}" width="${group.w}" height="${group.h}" as="geometry"/>` +
+                    `</mxCell>`
+                );
+            });
+
+            diagram.nodes.forEach(node => {
+                const nodeId = `node-${escapeXml(node.id)}`;
+                const parent = node.groupId ? `group-${escapeXml(node.groupId)}` : '1';
+                const iconDataUrl = node.icon ? iconDataMap.get(node.icon) : null;
+                const label = escapeXml(node.label || 'Nodo');
+                const group = node.groupId ? diagram.groups.find(g => String(g.id) === String(node.groupId)) : null;
+                const x = group ? node.x - group.x : node.x;
+                const y = group ? node.y - group.y : node.y;
+
+                const styleParts = [
+                    'shape=rectangle',
+                    'rounded=1',
+                    'whiteSpace=wrap',
+                    'html=1',
+                    'fillColor=#f8fafc',
+                    'strokeColor=#334155',
+                    'fontSize=12',
+                    'fontColor=#0f172a',
+                    'align=left',
+                    'verticalAlign=middle',
+                    'spacingLeft=8',
+                    'spacingTop=8',
+                    'imageAspect=0',
+                    'imageAlign=left',
+                    'imageVerticalAlign=middle'
+                ];
+
+                if (iconDataUrl) {
+                    const encodedIconUrl = encodeURIComponent(iconDataUrl);
+                    styleParts.push(`image=${encodedIconUrl}`);
+                    styleParts.push('imageWidth=20');
+                    styleParts.push('imageHeight=20');
+                    styleParts.push('spacingLeft=28');
+                }
+
+                const style = styleParts.join(';');
+                cells.push(
+                    `<mxCell id="${nodeId}" value="${label}" style="${style}" vertex="1" parent="${parent}">` +
+                    `<mxGeometry x="${x}" y="${y}" width="${node.w}" height="${node.h}" as="geometry"/>` +
+                    `</mxCell>`
+                );
+            });
+
+            diagram.edges.forEach((edge, index) => {
+                const edgeId = `edge-${index}`;
+                const sourceId = `node-${escapeXml(edge.from)}`;
+                const targetId = `node-${escapeXml(edge.to)}`;
+                const label = escapeXml(edge.label || '');
+                const styleParts = ['edgeStyle=orthogonalEdgeStyle', 'rounded=0', 'html=1', 'strokeColor=#0f172a'];
+                if (edge.lineStyle === 'dashed') styleParts.push('dashed=1');
+                else if (edge.lineStyle === 'dotted') styleParts.push('dashed=1;dashPattern=1 4');
+                if (edge.color) styleParts.push(`strokeColor=${escapeXml(edge.color)}`);
+                if (edge.endArrow === 'arrow') styleParts.push('endArrow=block');
+                const style = styleParts.join(';');
+
+                cells.push(
+                    `<mxCell id="${edgeId}" value="${label}" style="${style}" edge="1" parent="1" source="${sourceId}" target="${targetId}">` +
+                    `<mxGeometry relative="1" as="geometry"/>` +
+                    `</mxCell>`
+                );
+            });
+
+            const content = cells.join('');
+            return `<?xml version="1.0" encoding="UTF-8"?>` +
+                `<mxfile host="app.diagrams.net">` +
+                `<diagram id="diagram-1" name="Page-1">` +
+                `<mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">` +
+                `<root>${content}</root>` +
+                `</mxGraphModel>` +
+                `</diagram>` +
+                `</mxfile>`;
         }
 
         // Recopila las respuestas del formulario por pasos en un objeto plano.
@@ -861,6 +1178,12 @@
             el.style.height = `${node.h}px`;
 
             el.appendChild(crearIconoNodo(node));
+            el.addEventListener('click', (e) => {
+                if (conexionSeleccionando) {
+                    e.stopPropagation();
+                    seleccionarNodoParaConexion(node);
+                }
+            });
 
             const label = document.createElement('span');
             label.className = "node-label";
@@ -1007,8 +1330,8 @@
             `;
 
             diagramData.edges.forEach((edge, index) => {
-                const fromNode = diagramData.nodes.find(n => n.id === edge.from);
-                const toNode = diagramData.nodes.find(n => n.id === edge.to);
+                const fromNode = diagramData.nodes.find(n => String(n.id) === String(edge.from));
+                const toNode = diagramData.nodes.find(n => String(n.id) === String(edge.to));
                 if (!fromNode || !toNode) return;
 
                 normalizarNodo(fromNode);
@@ -1306,6 +1629,7 @@
         function cerrarSelectorIcono() {
             document.getElementById('modal-iconos').classList.add('hidden');
             nodoEditandoIcono = null;
+            editandoIconoEnNuevoNodo = false;
         }
 
         function programarBusquedaIconos() {
@@ -1354,6 +1678,11 @@
         }
 
         function seleccionarIcono(ruta) {
+            if (editandoIconoEnNuevoNodo) {
+                document.getElementById('agregarNodoIcono').value = ruta;
+                cerrarSelectorIcono();
+                return;
+            }
             if (!nodoEditandoIcono) return;
             nodoEditandoIcono.icon = ruta;
             actualizarIconoNodo(nodoEditandoIcono);
@@ -1370,7 +1699,7 @@
             // tapar las líneas, así que el clic en zona vacía llega directo
             // al contenedor del canvas.)
             document.getElementById('canvas-container').addEventListener('mousedown', (e) => {
-                if (e.target.id === 'canvas-container' || e.target.id === 'nodes-layer') deseleccionarTodo();
+                if (e.target.id === 'canvas-container' || e.target.id === 'nodes-layer' || e.target.id === 'canvas-svg') deseleccionarTodo();
             });
 
             ['aristaLabel', 'aristaColor', 'aristaGrosor', 'aristaEstilo'].forEach(id => {
@@ -1429,6 +1758,228 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+        }
+
+        function getNextNodeId() {
+            const ids = diagramData.nodes
+                .map(n => Number(n.id))
+                .filter(id => Number.isFinite(id));
+            return ids.length ? Math.max(...ids) + 1 : 1;
+        }
+
+        function abrirModalAgregarNodo() {
+            document.getElementById('agregarNodoLabel').value = '';
+            document.getElementById('agregarNodoIcono').value = '';
+            editandoIconoEnNuevoNodo = false;
+            poblarGrupoSelect();
+            document.getElementById('modal-agregar-nodo').classList.remove('hidden');
+        }
+
+        function abrirSelectorIconoNuevoNodo() {
+            editandoIconoEnNuevoNodo = true;
+            nodoEditandoIcono = null;
+            document.getElementById('modal-iconos').classList.remove('hidden');
+            document.getElementById('iconoBusqueda').value = document.getElementById('agregarNodoLabel').value.trim() || '';
+            document.getElementById('iconoProveedor').value = '';
+            buscarIconos();
+            document.getElementById('iconoBusqueda').focus();
+            document.getElementById('iconoBusqueda').select();
+        }
+
+        function cerrarModalAgregarNodo() {
+            document.getElementById('modal-agregar-nodo').classList.add('hidden');
+            editandoIconoEnNuevoNodo = false;
+        }
+
+        function abrirModalAgregarConexion() {
+            conexionSeleccionando = null;
+            poblarSelectsConexion();
+            document.getElementById('conexionLabel').value = '';
+            document.getElementById('conexionColor').value = '#888780';
+            document.getElementById('conexionGrosor').value = 1.5;
+            document.getElementById('conexionEstilo').value = 'solid';
+            document.getElementById('conexionArrow').value = 'none';
+            actualizarStatusConexion();
+            document.getElementById('modal-agregar-conexion').classList.remove('hidden');
+        }
+
+        function cerrarModalAgregarConexion() {
+            document.getElementById('modal-agregar-conexion').classList.add('hidden');
+            conexionSeleccionando = null;
+        }
+
+        function iniciarSeleccionConexionEnCanvas(field) {
+            if (!diagramData.nodes.length) {
+                alert('No hay nodos en el diagrama para seleccionar.');
+                return;
+            }
+            conexionSeleccionando = {
+                field,
+                source: document.getElementById('conexionSource')?.value || null,
+                target: document.getElementById('conexionTarget')?.value || null,
+            };
+            document.getElementById('modal-agregar-conexion').classList.add('hidden');
+            actualizarStatusConexion();
+            alert(field === 'source' ? 'Haz clic en el nodo origen en el lienzo.' : 'Haz clic en el nodo destino en el lienzo.');
+        }
+
+        function seleccionarNodoParaConexion(node) {
+            if (!conexionSeleccionando) return;
+            if (conexionSeleccionando.field === 'source') {
+                document.getElementById('conexionSource').value = node.id;
+                conexionSeleccionando.source = String(node.id);
+                conexionSeleccionando.field = 'target';
+                actualizarStatusConexion();
+                alert('Origen seleccionado: ' + node.label + '. Ahora selecciona el nodo destino.');
+                document.getElementById('modal-agregar-conexion').classList.remove('hidden');
+                return;
+            }
+            if (conexionSeleccionando.field === 'target') {
+                if (String(node.id) === String(conexionSeleccionando.source)) {
+                    alert('El nodo destino no puede ser el mismo que el origen. Selecciona otro nodo.');
+                    return;
+                }
+                document.getElementById('conexionTarget').value = node.id;
+                conexionSeleccionando.target = String(node.id);
+                actualizarStatusConexion();
+                document.getElementById('modal-agregar-conexion').classList.remove('hidden');
+                return;
+            }
+        }
+
+        function actualizarStatusConexion() {
+            const status = document.getElementById('conexionStatusText');
+            if (!status) return;
+            if (!conexionSeleccionando || !conexionSeleccionando.field) {
+                status.textContent = 'Selecciona origen y destino en el modal o usa canvas.';
+                return;
+            }
+            if (conexionSeleccionando.field === 'source') {
+                status.textContent = 'Selecciona el nodo origen en el lienzo.';
+                return;
+            }
+            if (conexionSeleccionando.field === 'target') {
+                const sourceLabel = diagramData.nodes.find(n => String(n.id) === String(conexionSeleccionando.source))?.label || 'Origen seleccionado';
+                status.textContent = `Origen seleccionado: ${sourceLabel}. Ahora selecciona el nodo destino en el lienzo.`;
+                return;
+            }
+        }
+
+        function poblarSelectsConexion() {
+            const source = document.getElementById('conexionSource');
+            const target = document.getElementById('conexionTarget');
+            source.innerHTML = '';
+            target.innerHTML = '';
+
+            if (!diagramData.nodes.length) {
+                const empty = document.createElement('option');
+                empty.value = '';
+                empty.textContent = 'No hay nodos disponibles';
+                source.appendChild(empty);
+                target.appendChild(empty.cloneNode(true));
+                document.getElementById('btnConfirmarAgregarConexion').disabled = true;
+                return;
+            }
+
+            diagramData.nodes.forEach(node => {
+                const option1 = document.createElement('option');
+                option1.value = node.id;
+                option1.textContent = node.label;
+                source.appendChild(option1);
+
+                const option2 = document.createElement('option');
+                option2.value = node.id;
+                option2.textContent = node.label;
+                target.appendChild(option2);
+            });
+
+            document.getElementById('btnConfirmarAgregarConexion').disabled = false;
+        }
+
+        function agregarConexion() {
+            const from = document.getElementById('conexionSource').value;
+            const to = document.getElementById('conexionTarget').value;
+            const label = document.getElementById('conexionLabel').value.trim();
+            const color = document.getElementById('conexionColor').value;
+            const thickness = parseFloat(document.getElementById('conexionGrosor').value) || 1.5;
+            const lineStyle = document.getElementById('conexionEstilo').value;
+            const endArrow = document.getElementById('conexionArrow').value === 'arrow' ? 'arrow' : undefined;
+
+            if (!from || !to) {
+                alert('Selecciona nodo origen y destino.');
+                return;
+            }
+            if (from === to) {
+                alert('El nodo origen y destino no pueden ser el mismo.');
+                return;
+            }
+
+            diagramData.edges.push({
+                from,
+                to,
+                label,
+                color,
+                thickness,
+                lineStyle,
+                endArrow,
+            });
+            renderizarDiagrama(diagramData);
+            cerrarModalAgregarConexion();
+        }
+
+        function eliminarNodoSeleccionado() {
+            if (!seleccion || seleccion.tipo !== 'nodo') {
+                alert('Selecciona primero un nodo en el diagrama para eliminarlo.');
+                return;
+            }
+            const nodo = diagramData.nodes.find(n => String(n.id) === String(seleccion.id));
+            const nombre = nodo ? nodo.label : 'este nodo';
+            const confirmado = window.confirm(`¿Estás seguro de que deseas eliminar "${nombre}" y todas sus conexiones?`);
+            if (!confirmado) {
+                return;
+            }
+            diagramData.nodes = diagramData.nodes.filter(n => String(n.id) !== String(seleccion.id));
+            diagramData.edges = diagramData.edges.filter(ed => String(ed.from) !== String(seleccion.id) && String(ed.to) !== String(seleccion.id));
+            seleccion = null;
+            renderizarDiagrama(diagramData);
+        }
+
+        function poblarGrupoSelect() {
+            const select = document.getElementById('agregarNodoGroup');
+            select.innerHTML = '<option value="">Sin grupo</option>';
+            diagramData.groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.label;
+                select.appendChild(option);
+            });
+        }
+
+        function agregarNodo() {
+            const label = document.getElementById('agregarNodoLabel').value.trim();
+            const icono = document.getElementById('agregarNodoIcono').value.trim();
+            const groupId = document.getElementById('agregarNodoGroup').value;
+
+            if (!label) {
+                alert('Debes ingresar un nombre para el nodo.');
+                return;
+            }
+
+            const nuevoNodo = {
+                id: getNextNodeId(),
+                label,
+                x: 120 + (diagramData.nodes.length * 24) % 360,
+                y: 120 + (diagramData.nodes.length * 18) % 260,
+                w: 140,
+                h: 70,
+            };
+
+            if (icono) nuevoNodo.icon = icono;
+            if (groupId) nuevoNodo.groupId = groupId;
+
+            diagramData.nodes.push(nuevoNodo);
+            renderizarDiagrama(diagramData);
+            cerrarModalAgregarNodo();
         }
     </script>
 </body>

@@ -77,6 +77,7 @@ def generar_desde_requisitos():
         return jsonify({"error": str(e)}), 502
     except Exception as e:
         return jsonify({"error": f"Error generando el diagrama: {e}"}), 500
+        
 
     return jsonify(resultado)
 

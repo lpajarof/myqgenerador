@@ -149,13 +149,11 @@ def generar_diagrama_desde_documento(texto_usuario: str) -> dict:
       para mostrar en el panel de análisis.
     """
     modelo_conceptual = generar_modelo_conceptual(texto_usuario)
+    print("Modelo conceptual generado:\n", modelo_conceptual)  # Para depuración
     diagrama = _invocar_agente_3(modelo_conceptual)
 
-    # El Agente 2 a veces ya envuelve su propia salida en ```yaml ... ```;
-    # quitamos esas fences antes de volver a envolverla nosotros, para no
-    # terminar con un bloque de código anidado dos veces.
-    modelo_sin_fences = re.sub(r"^```[a-zA-Z]*\n?|\n?```$", "", modelo_conceptual.strip())
-    analisis = f"## Modelo Conceptual Extraído (Agente 2)\n\n```yaml\n{modelo_sin_fences.strip()}\n```"
+    
+    analisis = ""
 
     return {
         "diagrama": diagrama,

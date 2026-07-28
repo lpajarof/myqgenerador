@@ -1,6 +1,7 @@
 import os
 from typing import Optional
 from langchain_ollama import ChatOllama
+from langchain_openai import AzureChatOpenAI, ChatOpenAI
 
 class ModelsIA:
     """Clase que decide qué modelo usar para los agentes según la
@@ -33,7 +34,15 @@ class ModelsIA:
             # formato esperado opcional: 'provider:modelname' -> usar modelname
             if ":" in env_val:
                 left, right = env_val.split(":", 1)
-                if left.lower() == 'openai' or left.lower() == 'anthropic':
+                if left.lower() == 'openai':
+                    model_openai = ChatOpenAI(
+                        model=right,
+                        api_key=os.environ.get('OPENAI_API_KEY'),
+                        base_url=os.environ.get('BASE_URL_OPENAI'),
+                        temperature=0.1,
+                        )                    
+                    return model_openai                    
+                elif left.lower() == 'anthropic':
                     return right
                 elif left.lower() == 'google_genai':
                     return env_val
