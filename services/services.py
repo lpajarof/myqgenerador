@@ -64,7 +64,10 @@ def extraer_analisis(texto: str) -> str:
     mostrarse como Markdown en el panel de análisis."""
     if not texto:
         return ""
-    return re.sub(r"```json\s*.*?```", "", texto, flags=re.DOTALL).strip()
+
+    analisis = re.sub(r"```json\s*.*?```", "", texto, flags=re.DOTALL)
+    analisis = analisis.replace("## SECCIÓN 2: JSON de la Arquitectura", "")
+    return analisis.strip()
 
 
 
@@ -148,14 +151,7 @@ def generar_diagrama_desde_documento(texto_usuario: str) -> dict:
     - "analisis": la sustentación arquitectónica (Markdown) del requirements_agent,
       para mostrar en el panel de análisis.
     """
-    modelo_conceptual = generar_modelo_conceptual(texto_usuario)
-    print("Modelo conceptual generado:\n", modelo_conceptual)  # Para depuración
-    diagrama = _invocar_agente_3(modelo_conceptual)
-
+    requisitos_desde_documento = generar_modelo_conceptual(texto_usuario)
     
-    analisis = ""
-
-    return {
-        "diagrama": diagrama,
-        "analisis": analisis,
-    }
+        
+    return generar_diagrama_completo(requisitos_desde_documento)
